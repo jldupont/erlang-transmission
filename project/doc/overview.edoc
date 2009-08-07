@@ -1,0 +1,33 @@
+@author Jean-Lou Dupont
+@title  Erlang-transmission documentation
+
+@doc    
+
+The library implements a BT Transmission client 
+
+== Usage == 
+
+	```
+		twitter:start(),
+		twitter:req({self(), from_twitter}, ...),
+		...
+	'''
+
+In your application code, be prepared to receive response messages:
+
+	```
+		receive
+			{from_twitter, response ...
+	'''
+
+== Twitter Methods supported ==
+The following methods are currently supported:
+
+	<ul>
+ 		<li>users.show</li>
+ 		<li>statuses.user_timeline</li>
+ 		<li>statuses.update</li>
+ 	</ul>
+ 	
+More methods can easily supported; functions acting as ''pattern matchers'' for the desired Twitter methods can be added to the code.
+I currently only have need for the aforementioned. 
