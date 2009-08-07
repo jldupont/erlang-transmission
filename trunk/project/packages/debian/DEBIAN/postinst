@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+"""
+	@author: Jean-Lou Dupont
+	
+	from: http://www.debian.org/doc/debian-policy/ch-maintainerscripts.html
+	Cases:
+	
+		postinst configure most-recently-configured-version
+	
+		old-postinst abort-upgrade new-version
+		
+		conflictor's-postinst abort-remove in-favour package new-version
+		
+		postinst abort-remove
+		
+		deconfigured's-postinst abort-deconfigure in-favour failed-install-package version [removing conflicting-package version]
+		
+		
+	Policy 10.7.3
+	
+		A common practice is to create a script called package-configure and have the package's postinst call it 
+		if and only if the configuration file does not already exist. 
+		In certain cases it is useful for there to be an example or template file which the maintainer scripts use. 
+		Such files should be in /usr/share/package or /usr/lib/package (depending on whether they are architecture-independent or not). 
+		There should be symbolic links to them from /usr/share/doc/package/examples if they are examples, 
+		and should be perfectly ordinary dpkg-handled files (not configuration files).
+
+"""
+
+import os
+import sys
+
+this_lib     = "erlang-transmission"
+this_version = "$version"
+
+command = sys.argv[1]
+version = sys.argv[2]
+cwd     = os.getcwd()
+
+print "%s: postinst: command[%s] configured version [%s] this version[%s]" % (this_lib, command, version, this_version)
+
+"""
+	1) Remove previous configured version symlink (if any)
+	2) Create current version symlink
+"""
+
+basedir="/usr/lib/erlang/lib/twitter-%s"
+basesym="/usr/lib/erlang/lib/twitter"
+
+if command == 'configure':
+
+	
+	#configured version
+	cv  = basedir % version
+	
+	#new version
+	nv  = basedir % this_version
+
+	#remove current version
+	# **ONLY** if it is not the version we are trying to install ;-)
+	if version != this_version:
+	
+		#not applicable in this context
+		pass
+		
+	try:	
+		os.remove(basesym)
+		print "%s: removed symlink [%s]" % (this_lib, basesym)
+	except:
+		print "%s: symlink not found[%s]" % (this_lib, basesym)
+
+	code = 0
+	try:
+		#creating symlink
+		
+		os.symlink( nv,  basesym )
+		print "%s: created symlink, src[%s] => dst[%s]" % (this_lib, nv, basesym)
+		
+		os.chmod(nv,      0700)
+		os.chmod(basesym, 0700)
+		
+	except Exception,e:
+		print "Exception [%s]" % e
+		code = 1
+	
+	sys.exit( code )
+	
