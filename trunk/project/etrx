@@ -5,52 +5,82 @@
 %% @author Jean-Lou Dupont
 %%
 
-err_lib() -> "erlang-transmission not found".
-err_cmd() -> "unknown command: ".
+cmd_daemon1() -> "erl -detached -pa ".
+cmd_daemon2() -> " -sname transmission -run transmission_daemon start".
+cmd_daemon3() -> "./etrx_start".
+
+err_lib()    -> "erlang-transmission not found".
+err_cmd()    -> "unknown command: ".
+err_daemon() -> "daemon not found".
+msg_kill()   -> "stop command sent".
 
 main([]) ->
 	main([start]);
 
 main(["stop"]) ->
-	err("stop?");
+	case getstatus() of
+		daemon_not_found ->
+			err(err_daemon());
+					
+		{pid, Pid} ->
+			os:cmd("kill -9 "++Pid),
+			msg(msg_kill()),
+			halt(0);
+			
+		{error, lib_not_found} ->
+			err(err_lib())
+	end;		
 	
 
-main([start]) ->
+main(["start"]) ->
+
+	%%for development
 	code:add_pathsa(["./ebin"]),
 	
-	try
-		%%io:format("Node[~s]~n", [node()]),
-		Status = transmission_admin:daemon(status),
-		%%io:format("status[~p]~n", [Status])
-
-		case Status of
-		 
-			rpcerror ->
-				trystart();
-				
-			{pid, Pid} ->
-				msg("daemon running, pid:", Pid)	
-				
-		end
-
-		
-	catch
-	
-		error:undef ->
-			err(err_lib());
-		
-		X:Y ->
-			io:format("X[~p] Y[~p]~n", [X,Y]),
-			halt(1)
-
+	case getstatus() of
+		daemon_not_found ->
+			trystart();
+					
+		{pid, Pid} ->
+			err("daemon running, Pid:", Pid);
+			
+		{error, lib_not_found} ->
+			err(err_lib())
 	end;
+	
 	
 	
 main([NA]) ->
 	err(err_cmd(), NA).
 
 
+getstatus() ->
+	try
+		Status=rpc(status),
+		case Status of
+			rpcerror ->
+				daemon_not_found;
+				
+			{pid, Pid} ->
+				{pid, Pid}	
+		end
+	catch
+		error:undef ->
+			{error, lib_not_found};
+		
+		_X:_Y ->
+			{error, unknown}
+	end.
+
+
 trystart() ->
+	%%{ok, Dir}=file:get_cwd(),
+	%%io:format("trystart, dir[~s]~n", [Dir]),
+	%%Command=cmd_daemon1() ++ Dir ++ "/ebin" ++ cmd_daemon2(),
+	%%io:format("Command [~s]~n", [Command]),
+	%%Ret=os:cmd(Command),
+	Ret=os:cmd(cmd_daemon3()),
+	msg(Ret),
 	ok.
 	
 	
@@ -62,10 +92,40 @@ err(Msg1, Msg2) ->
 	io:format("etrx: ~s~s~n", [Msg1, Msg2]),
 	halt(1).
 
-%%msg(Msg) ->
-%%	io:format("etrx: ~s~n", [Msg]),
+msg(Msg) ->
+	io:format("etrx: ~s~n", [Msg]),
+	halt(0).
+	
+%%msg(Msg1, Msg2) ->
+%%	io:format("etrx: ~s~s~n", [Msg1, Msg2]),
 %%	halt(0).
 	
-msg(Msg1, Msg2) ->
-	io:format("etrx: ~s~s~n", [Msg1, Msg2]),
-	halt(0).
+	
+
+
+%%%%%%%%%%%%%%	
+%% RPC related
+%%%%%%%%%%%%%%
+	
+rpc(Command) ->
+	case dorpc(Command) of
+		{badrpc, _} ->
+			daemon_not_found;
+
+		Response ->
+			Response
+	end.
+	
+
+
+dorpc(Message) ->
+	Node=tools:make_node(transmission),
+	
+	case rpc:call(Node, transmission_daemon, api, [Message], 2000) of
+		{badrpc, _Reason} ->
+			%%io:format("daemon communication error [~p]~n", [Reason]),
+			rpcerror;
+		
+		Other ->
+			Other
+	end.
