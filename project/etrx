@@ -11,6 +11,22 @@ from optparse import OptionParser
 
 class Commands(object):
 	
+	cmdStart="erl -pa %s -detached -sname transmission -run transmission_daemon start"
+	cmdStop= "etrx_control -q stop"
+	
+	"""
+		code_ok()               -> 0.
+		code_error()            -> 1.
+		code_daemon_found()     -> 2.
+		code_daemon_not_found() -> 3.
+		code_lib_not_found()    -> 4.
+	"""
+	
+	codes = {0: "ok", 1: "error", 
+			2: "daemon found", 3: "daemon not found", 
+			4:"library not found"
+			}
+	
 	@classmethod
 	def start(cls, feedback):
 		print "start %s" % feedback
