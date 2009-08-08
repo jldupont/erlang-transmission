@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-erl -detached -sname transmission -pa ./ebin -run transmission_daemon start

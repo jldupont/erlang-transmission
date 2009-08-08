@@ -1,0 +1,126 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -sname etrx_control
+%%
+%% @author Jean-Lou Dupont
+%%
+
+code_ok()               -> 0.
+code_error()            -> 1.
+code_daemon_found()     -> 2.
+code_daemon_not_found() -> 3.
+code_lib_not_found()    -> 4.
+
+
+err_lib()    -> "erlang-transmission not found".
+err_daemon() -> "daemon not found".
+
+msg_pid()    -> "daemon found, pid: ".
+msg_usage()  -> "usage: etrx_control [-q] [status|stop]".
+msg_kill()   -> "stop command sent".
+
+
+main(["-q", "stop"]) -> 	run(quiet,   stop);
+main(["-q", "status"]) ->	run(quiet, 	 status);
+main(["stop"]) ->			run(verbose, stop);
+main(["status"]) ->			run(verbose, status);
+	
+main([]) ->
+	msg(verbose, code_ok(), msg_usage()),
+	halt(code_ok());
+	
+main([_Cmd]) ->
+	msg(verbose, code_ok(), msg_usage()),
+	halt(code_error()).
+
+
+run(Feedback, stop) ->
+	case getstatus() of
+		daemon_not_found ->
+			msg(Feedback, code_daemon_not_found(), err_daemon());
+					
+		{pid, Pid} ->
+			os:cmd("kill -9 "++Pid),
+			msg(Feedback, code_ok(), msg_kill());
+			
+		{error, lib_not_found} ->
+			msg(Feedback, code_lib_not_found(), err_lib())
+	end;		
+	
+
+run(Feedback, status) ->
+
+	%%for development
+	code:add_pathsa(["./ebin"]),
+	
+	case getstatus() of
+		daemon_not_found ->
+			msg(Feedback, code_daemon_found(), err_daemon());
+					
+		{pid, Pid} ->
+			msg(Feedback, code_daemon_found(), msg_pid(), Pid);
+			
+		{error, lib_not_found} ->
+			msg(Feedback, code_lib_not_found(), err_lib())
+	end.
+	
+
+
+
+getstatus() ->
+	try
+		Status=rpc(status),
+		case Status of
+			rpcerror ->
+				daemon_not_found;
+				
+			{pid, Pid} ->
+				{pid, Pid}	
+		end
+	catch
+		error:undef ->
+			{error, lib_not_found};
+		
+		_X:_Y ->
+			{error, unknown}
+	end.
+
+
+msg(Feedback, Code, Msg) ->
+	case Feedback of 
+		verbose ->
+			io:format("etrx_control: ~s~n", [Msg]);
+		_ ->
+			ok
+	end,	
+	halt(Code).
+	
+msg(Feedback, Code, Msg1, Msg2) ->
+	msg(Feedback, Code, Msg1++Msg2).
+
+
+%%%%%%%%%%%%%%	
+%% RPC related
+%%%%%%%%%%%%%%
+	
+rpc(Command) ->
+	case dorpc(Command) of
+		rpcerror ->
+			daemon_not_found;
+	
+		Response ->
+			Response
+	end.
+	
+
+
+dorpc(Message) ->
+	Node=tools:make_node(transmission),
+	
+	case rpc:call(Node, transmission_daemon, api, [Message], 2000) of
+		{badrpc, _Reason} ->
+			rpcerror;
+		
+		Other ->
+			Other
+	end.
