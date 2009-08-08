@@ -27,11 +27,8 @@
 %%
 
 %% 
-daemon(stop) ->
-	prerpc(stop);
-	
 daemon(status) ->
-	prerpc(status);
+	prerpc({{self(), response}, status});
 
 daemon(Other) ->
 	{command_invalid, Other}.	
@@ -55,7 +52,7 @@ prerpc(Command) ->
 
 dorpc(Message) ->
 	Node=tools:make_node(?DAEMON),
-
+	%%io:format("~p:dorpc: node[~p]",[?MODULE, Node]),
 	case rpc:call(Node, ?DAEMON_MODULE, api, [Message], ?RPC_TIMEOUT) of
 		{badrpc, Reason} ->
 			io:format("daemon communication error [~p]~n", [Reason]),

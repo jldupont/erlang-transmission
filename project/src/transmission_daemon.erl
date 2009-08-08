@@ -17,6 +17,7 @@
 		 stop/0,
 		 
 		 %% API
+		 api/1,
 		 req/4
 		 ]).
 
@@ -31,21 +32,34 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions - not really part of API per-se
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start() ->
-	dostart([start]).
+start() ->	dostart([start]).
 
-start(Args) ->
-	dostart(Args).
+start([]) -> dostart([start]);
 
-stop() ->
-	?SERVER ! stop.
+start(Args) ->	dostart(Args).
+
+stop() -> ?SERVER ! stop.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RPC Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+api(status) ->
+	os:getpid();
+
+api(Cmd) ->
+	{command_invalid, Cmd}.
+
+
+
 req(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
 	rpc({request, ReplyDetails, Method, MandatoryParams, OptionalParams}).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ADMIN API Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,8 +85,9 @@ rpc(Q) ->
 
 
 dostart(Args) ->
-	Pid=spawn_link(?MODULE, loop, Args),
+	Pid=spawn_link(?MODULE, loop, [Args]),
 	register(?SERVER, Pid),
+	io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
 	{ok, Pid}.
 
 
@@ -105,4 +120,4 @@ reply({From, Context}, Message) ->
 
 
 doreq(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
-	ok.
+	reply(ReplyDetails, request_done).
