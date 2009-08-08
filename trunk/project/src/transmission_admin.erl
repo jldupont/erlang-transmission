@@ -28,7 +28,7 @@
 
 %% 
 daemon(status) ->
-	prerpc({{self(), response}, status});
+	prerpc(status);
 
 daemon(Other) ->
 	{command_invalid, Other}.	
@@ -59,6 +59,6 @@ dorpc(Message) ->
 			rpcerror;
 		
 		Other ->
-			io:format("~p:dorpc: received [~p]~n", [?MODULE, Other]),
+			%%io:format("~p:dorpc: received [~p]~n", [?MODULE, Other]),
 			Other
 	end.
