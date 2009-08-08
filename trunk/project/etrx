@@ -1,0 +1,56 @@
+#!/usr/bin/env escript
+
+err_lib() -> "erlang-transmission not found".
+err_cmd() -> "unknown command: ".
+
+main([]) ->
+	main([start]);
+
+main(["stop"]) ->
+	err("stop?");
+	
+
+main([start]) ->
+	code:add_pathsa(["./ebin"]),
+	
+	try
+		Status = transmission_admin:daemon(status),
+		%%io:format("status[~p]~n", [Status])
+
+		case Status of
+		 
+			rpcerror ->
+				msg("daemon not found")
+				
+		end
+
+		
+	catch
+	
+		error:undef ->
+			err(err_lib());
+		
+		X:Y ->
+			io:format("X[~p] Y[~p]~n", [X,Y]),
+			halt(1)
+
+	end;
+	
+
+	
+	
+main([NA]) ->
+	err(err_cmd(), NA).
+	
+	
+err(Msg) ->
+	io:format("etrx: ~s~n", [Msg]),
+	halt(1).
+	
+err(Msg1, Msg2) ->
+	io:format("etrx: ~s~s~n", [Msg1, Msg2]),
+	halt(1).
+
+msg(Msg) ->
+	io:format("etrx: ~s~n", [Msg]),
+	halt(0).
