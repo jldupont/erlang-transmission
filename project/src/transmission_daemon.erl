@@ -45,7 +45,7 @@ stop() -> ?SERVER ! stop.
 %% RPC Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 api(status) ->
-	os:getpid();
+	{pid, os:getpid()};
 
 api(Cmd) ->
 	{command_invalid, Cmd}.
