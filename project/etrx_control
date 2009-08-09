@@ -10,10 +10,12 @@ code_error()            -> 1.
 code_daemon_found()     -> 2.
 code_daemon_not_found() -> 3.
 code_lib_not_found()    -> 4.
+code_node_not_found()   -> 5.
 
 
 err_lib()    -> "erlang-transmission not found".
 err_daemon() -> "daemon not found".
+err_node()   -> "transmission node not found".
 
 msg_pid()    -> "daemon found, pid: ".
 msg_usage()  -> "usage: etrx_control [-q] [status|stop]".
@@ -35,6 +37,9 @@ main([_Cmd]) ->
 
 
 run(Feedback, stop) ->
+
+	add_cwd(),
+	
 	case getstatus() of
 		daemon_not_found ->
 			msg(Feedback, code_daemon_not_found(), err_daemon());
@@ -44,14 +49,17 @@ run(Feedback, stop) ->
 			msg(Feedback, code_ok(), msg_kill());
 			
 		{error, lib_not_found} ->
-			msg(Feedback, code_lib_not_found(), err_lib())
+			msg(Feedback, code_lib_not_found(), err_lib());
+			
+		{error, node_not_found} ->
+			msg(Feedback, code_node_not_found(), err_node())		
 	end;		
 	
 
 run(Feedback, status) ->
 
 	%%for development
-	code:add_pathsa(["./ebin"]),
+	add_cwd(),
 	
 	case getstatus() of
 		daemon_not_found ->
@@ -61,10 +69,18 @@ run(Feedback, status) ->
 			msg(Feedback, code_daemon_found(), msg_pid(), Pid);
 			
 		{error, lib_not_found} ->
-			msg(Feedback, code_lib_not_found(), err_lib())
+			msg(Feedback, code_lib_not_found(), err_lib());
+			
+		{error, node_not_found} ->
+			msg(Feedback, code_node_not_found(), err_node())		
+	
 	end.
 	
 
+add_cwd() ->
+	{ok,Cwd}=file:get_cwd(),
+	Cp=Cwd++"/ebin",
+	code:add_pathsa([Cp]).
 
 
 getstatus() ->
@@ -82,7 +98,7 @@ getstatus() ->
 			{error, lib_not_found};
 		
 		_X:_Y ->
-			{error, unknown}
+			{error, node_not_found}
 	end.
 
 

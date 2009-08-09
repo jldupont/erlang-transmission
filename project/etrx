@@ -7,34 +7,44 @@
 """
 import os
 import sys
+import subprocess
 from optparse import OptionParser
 
 class Commands(object):
 	
 	cmdStart="erl -pa %s -detached -sname transmission -run transmission_daemon start"
-	cmdStop= "etrx_control -q stop"
+	cmdStop= "escript etrx_control -q stop"
 	
-	"""
-		code_ok()               -> 0.
-		code_error()            -> 1.
-		code_daemon_found()     -> 2.
-		code_daemon_not_found() -> 3.
-		code_lib_not_found()    -> 4.
-	"""
-	
-	codes = {0: "ok", 1: "error", 
-			2: "daemon found", 3: "daemon not found", 
-			4:"library not found"
+	codes = {	0: {"msg":"ok",                "canstart": True},
+				1: {"msg":"unspecified error", "canstart": True}, 
+				2: {"msg":"daemon found",      "canstart": False}, 
+				3: {"msg":"daemon not found",  "canstart": True}, 
+				4: {"msg":"library not found", "canstart": False},
+				5: {"msg":"node not found",    "canstart": True},
 			}
 	
-	@classmethod
-	def start(cls, feedback):
+	def start(self, feedback):
 		print "start %s" % feedback
 		
-	@classmethod
-	def stop(cls, feedback):
-		print "stop"
+	def stop(self, feedback):
+		self.dostop()
+	
+	def dostart(self):
+		cwd=os.getcwd()
+		proc = subprocess.Popen(self.cmdStart % (cwd+"/ebin"), shell=True)
+		return proc.wait()
 		
+	def dostop(self):
+		proc = subprocess.Popen(self.cmdStop, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self.getCtx(ret)
+		if ctx is not None:
+			
+
+	def getCtx(self, code):
+		ctx=self.codes.get(code, None)
+		return ctx			
 
 
 def main():
@@ -56,7 +66,8 @@ def main():
 	
 	try:
 		getattr(Commands(), cmd)(feedback)
-	except:
+	except Exception, e:
+		print "Exception [%s]\n" % e
 		print "! invalid command [%s]\n" % cmd
 
 	
