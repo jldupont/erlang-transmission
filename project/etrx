@@ -12,42 +12,59 @@ from optparse import OptionParser
 
 class Commands(object):
 	
-	cmdStart="erl -pa %s -detached -sname transmission -run transmission_daemon start"
-	cmdStop= "escript etrx_control -q stop"
+	cmdStart  = "erl -pa %s -detached -sname transmission -run transmission_daemon start"
+	cmdStop   = "escript etrx_control -q stop"
+	cmdStatus = "escript etrx_control -q status"	
 	
+	dostart= "starting daemon"
 	nostop = "cannot stop daemon"
 	
-	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":"ok"},
-				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop}, 
-				2: {"msg":"daemon found",      "canstart": False, "stop":nostop}, 
-				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop}, 
-				4: {"msg":"library not found", "canstart": False, "stop":nostop},
-				5: {"msg":"node not found",    "canstart": True,  "stop":nostop},
+	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":"ok",   "start":dostart},
+				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop, "start":dostart}, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":nostop, "start":"cannot start daemon"}, 
+				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop, "start":dostart}, 
+				4: {"msg":"library not found", "canstart": False, "stop":nostop, "start":"cannot start daemon"},
+				5: {"msg":"node not found",    "canstart": True,  "stop":nostop, "start":dostart},
 			}
 	
-	def start(self, feedback):
-		print "start %s" % feedback
+	def start(self, fb):
+		ctx=self._canStart()
+		if fb:
+			print "etrx: %s [%s]\n" % (ctx["start"], ctx["msg"])
+		if not ctx["canstart"]:
+			sys.exit(1)
+
+		self._dostart()		
 		
 	def stop(self, feedback):
-		self.dostop()
+		self._dostop(feedback)
 	
-	def dostart(self):
+	def _dostart(self):
 		cwd=os.getcwd()
 		cmd=self.cmdStart % (cwd+"/ebin")
 		proc = subprocess.Popen(cmd, shell=True)
 		return proc.wait()
 		
-	def dostop(self):
+	def _dostop(self, fb):
 		proc = subprocess.Popen(self.cmdStop, shell=True)
 		proc.wait()
 		ret=proc.returncode
-		ctx=self.getCtx(ret)
-		print "etrx: %s [%s]\n" % (ctx["stop"], ctx["msg"])
+		ctx=self._getCtx(ret)
+		if fb:
+			print "etrx: %s [%s]\n" % (ctx["stop"], ctx["msg"])
 
-	def getCtx(self, code):
+	def _getCtx(self, code):
 		ctx=self.codes.get(code, self.codes[1])
 		return ctx			
 
+	def _canStart(self):
+		proc = subprocess.Popen(self.cmdStatus, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self._getCtx(ret)
+		return ctx
+		
+	
 
 def main():
 	usage= """etrx [-q] [start|stop] 
