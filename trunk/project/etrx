@@ -15,12 +15,14 @@ class Commands(object):
 	cmdStart="erl -pa %s -detached -sname transmission -run transmission_daemon start"
 	cmdStop= "escript etrx_control -q stop"
 	
-	codes = {	0: {"msg":"ok",                "canstart": True},
-				1: {"msg":"unspecified error", "canstart": True}, 
-				2: {"msg":"daemon found",      "canstart": False}, 
-				3: {"msg":"daemon not found",  "canstart": True}, 
-				4: {"msg":"library not found", "canstart": False},
-				5: {"msg":"node not found",    "canstart": True},
+	nostop = "cannot stop daemon"
+	
+	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":"ok"},
+				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop}, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":nostop}, 
+				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop}, 
+				4: {"msg":"library not found", "canstart": False, "stop":nostop},
+				5: {"msg":"node not found",    "canstart": True,  "stop":nostop},
 			}
 	
 	def start(self, feedback):
@@ -31,7 +33,8 @@ class Commands(object):
 	
 	def dostart(self):
 		cwd=os.getcwd()
-		proc = subprocess.Popen(self.cmdStart % (cwd+"/ebin"), shell=True)
+		cmd=self.cmdStart % (cwd+"/ebin")
+		proc = subprocess.Popen(cmd, shell=True)
 		return proc.wait()
 		
 	def dostop(self):
@@ -39,11 +42,10 @@ class Commands(object):
 		proc.wait()
 		ret=proc.returncode
 		ctx=self.getCtx(ret)
-		if ctx is not None:
-			
+		print "etrx: %s [%s]\n" % (ctx["stop"], ctx["msg"])
 
 	def getCtx(self, code):
-		ctx=self.codes.get(code, None)
+		ctx=self.codes.get(code, self.codes[1])
 		return ctx			
 
 
