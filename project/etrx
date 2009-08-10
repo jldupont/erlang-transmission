@@ -16,30 +16,35 @@ class Commands(object):
 	cmdStop   = "escript etrx_control -q stop"
 	cmdStatus = "escript etrx_control -q status"	
 	
-	dostart= "starting daemon"
-	nostop = "cannot stop daemon"
+	dostart  = "starting daemon"
+	nodaemon = "cannot start daemon"
+	nostop   = "cannot stop daemon"
+	canstop  = "ok"
 	
-	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":"ok",   "start":dostart},
-				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop, "start":dostart}, 
-				2: {"msg":"daemon found",      "canstart": False, "stop":nostop, "start":"cannot start daemon"}, 
-				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop, "start":dostart}, 
-				4: {"msg":"library not found", "canstart": False, "stop":nostop, "start":"cannot start daemon"},
-				5: {"msg":"node not found",    "canstart": True,  "stop":nostop, "start":dostart},
+	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart  },
+				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop,  "start":dostart  }, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":nostop,  "start":nodaemon }, 
+				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop,  "start":dostart  }, 
+				4: {"msg":"library not found", "canstart": False, "stop":nostop,  "start":nodaemon },
+				5: {"msg":"node not found",    "canstart": True,  "stop":nostop,  "start":dostart  },
 			}
 	
-	def start(self, fb):
+	def cmd_start(self, fb):
 		ctx=self._canStart()
 		if fb:
 			print "etrx: %s [%s]\n" % (ctx["start"], ctx["msg"])
 		if not ctx["canstart"]:
 			sys.exit(1)
 
-		self._dostart()		
+		self._dostart()
+		sys.exit(0)	
 		
-	def stop(self, feedback):
+	def cmd_stop(self, feedback):
 		self._dostop(feedback)
 	
 	def _dostart(self):
+	
+		#add development path
 		cwd=os.getcwd()
 		cmd=self.cmdStart % (cwd+"/ebin")
 		proc = subprocess.Popen(cmd, shell=True)
@@ -84,9 +89,9 @@ def main():
 	feedback = options.feedback
 	
 	try:
-		getattr(Commands(), cmd)(feedback)
+		getattr(Commands(), "cmd_"+cmd)(feedback)
 	except Exception, e:
-		print "Exception [%s]\n" % e
+		##print "Exception [%s]\n" % e
 		print "! invalid command [%s]\n" % cmd
 
 	
