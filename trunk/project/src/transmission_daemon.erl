@@ -1,6 +1,10 @@
 %% Author: Jean-Lou Dupont
 %% Created: 2009-08-07
-%% Description: TODO: Add description to transmission
+%% Description: Transmission client library
+%%
+%% Session-id:  recovered when 409 HTTP code received
+%%
+
 -module(transmission_daemon).
 
 %%
@@ -85,6 +89,7 @@ rpc(Q) ->
 
 
 dostart(Args) ->
+	inets:start(),
 	Pid=spawn_link(?MODULE, loop, [Args]),
 	register(?SERVER, Pid),
 	io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
