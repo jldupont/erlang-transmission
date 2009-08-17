@@ -23,8 +23,6 @@
 %%%-------------------------------------------------------------------
 -module(ktuo_parse_utils).
 
--include("eunit.hrl").
-
 -export([stringish_body/5, digit/5, digit19/4]).
 
 -define(LOC_1, 1).
@@ -255,45 +253,4 @@ digit_next(Stream, Acc, decimal, NewLines, Chars) ->
     exponent(Stream, Acc, NewLines, Chars);
 digit_next(Stream, Acc, exponent, NewLines, Chars) ->
     float_end(Stream, Acc, NewLines, Chars).
-
-%%=============================================================================
-%% Unit tests
-%%=============================================================================
-number_test() ->
-    ?assertMatch({44, [], {0, 2}}, digit("44", [], front, 0, 0)),
-    ?assertMatch({-44, [], {0, 3}}, digit("44", [$-], front, 0, 1)),
-    ?assertMatch({44.00, [], {0, 5}}, digit("44.00", [], front, 0, 0)),
-    ?assertMatch({-44.01, [], {0, 6}}, digit("44.01", [$-], front, 0, 1)),
-    ?assertMatch({44.00e+33, [], {0, 9}}, digit("44.00e+33", [], front, 0, 0)),
-    ?assertMatch({44.00e33, [], {0, 8}}, digit("44.00e33", [], front, 0, 0)),
-    ?assertMatch({44.00e-10, [], {0, 9}}, digit("44.00e-10", [], front, 0, 0)),
-    ?assertMatch({42.44, [], {0, 5}}, digit("42.44", [], front, 0, 0)),
-    ?assertMatch({41.33, [], {0, 5}}, digit("41.33", [], front, 0, 0)),
-    ?assertMatch({0, [], {0, 1}}, digit("0", [], front, 0, 0)).
-
-
-string_test() ->
-    ?assertMatch({"Hello World", [], {0, 13}},
-                 stringish_body($\", "Hello World\"", [], 0, 1)),
-    ?assertMatch({"Hello\n World", [], {1, 7}},
-                 stringish_body($\", "Hello\n World\"", [], 0, 1)),
-    ?assertMatch({"Hello\" World", [], {0, 15}},
-                 stringish_body($\", "Hello\\\" World\"", [], 0, 1)),
-    ?assertMatch({"Hello\\ World", [], {0, 14}},
-                 stringish_body($\", "Hello\\ World\"", [], 0, 1)),
-    ?assertMatch({"Hello\/ World", [], {0, 14}},
-                 stringish_body($\", "Hello\/ World\"", [], 0, 1)),
-    ?assertMatch({"Hello\b World", [], {0, 14}},
-                 stringish_body($\", "Hello\b World\"", [], 0, 1)),
-    ?assertMatch({"Hello\f World", [], {0, 14}},
-                 stringish_body($\", "Hello\f World\"", [], 0, 1)),
-    ?assertMatch({"Hello\n World", [], {1, 7}},
-                 stringish_body($\", "Hello\n World\"", [], 0, 1)),
-    ?assertMatch({"Hello\r World", [], {1, 7}},
-                 stringish_body($\", "Hello\r World\"", [], 0, 1)),
-    ?assertMatch({"Hello\t World", [], {0, 14}},
-                 stringish_body($\", "Hello\t World\"", [], 0, 1)),
-    ?assertMatch({"Hello% World", [], {0, 19}},
-                 stringish_body($\", "Hello\\u0025 World\"", [], 0, 1)).
-
 

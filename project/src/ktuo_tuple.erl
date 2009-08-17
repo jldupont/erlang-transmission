@@ -26,8 +26,6 @@
 %%%-------------------------------------------------------------------
 -module(ktuo_tuple).
 
--include("eunit.hrl").
-
 -compile(export_all).
 
 -export([decode/1, decode/3]).
@@ -194,54 +192,3 @@ bare_atom([], Acc, NewLines, Chars) ->
 bare_atom(Else, Acc, NewLines, Chars) when length(Acc) > 0->
     {list_to_existing_atom(lists:reverse(Acc)), Else, {NewLines, Chars}}.
 
-
-%%=============================================================================
-%% Unit tests
-%%=============================================================================
-decode_tuple_test() ->
-    ?assertMatch({{hello, 43}, [], {0, 11}}, decode("{hello, 43}")),
-    ?assertMatch({{{zoom}, 321, {32, "oeaueou"}}, [], {1, 2}},
-                 decode("{{zoom}, 321, {32, \"oeaueou\"\n}}")).
-
-decode_atom_test() ->
-    ?assertMatch({hello, [], {0, 5}}, decode("hello")),
-    ?assertMatch({goodbye, [], {0, 7}}, decode("goodbye")),
-    ?assertMatch({'ba ba black sheep', [], {0, 19}}, 
-                 decode("'ba ba black sheep'")).
-
-decode_number_test() ->
-    ?assertMatch({44, [], {0, 2}}, decode("44")),
-    ?assertMatch({-44, [], {0, 3}}, decode("-44")),
-    ?assertMatch({44.00, [], {0, 5}}, decode("44.00")),
-    ?assertMatch({-44.01, [], {0, 6}}, decode("-44.01")),
-    ?assertMatch({44.00e+33, [], {0, 9}}, decode("44.00e+33")),
-    ?assertMatch({44.00e33, [], {0, 8}}, decode("44.00e33")),
-    ?assertMatch({44.00e-10, [], {0, 9}}, decode("44.00e-10")),
-    ?assertMatch({42.44, [], {0, 5}}, decode("42.44")),
-    ?assertMatch({41.33, [], {0, 5}}, decode("41.33")),
-    ?assertMatch({0, [], {0, 1}}, decode("0")).
-
-
-decode_string_test() ->
-    ?assertMatch({"Hello World", [], {0, 13}},
-                 decode("\"Hello World\"")),
-    ?assertMatch({"Hello\n World", [], {1, 7}},
-                 decode("\"Hello\n World\"")),
-    ?assertMatch({"Hello\" World", [], {0, 15}},
-                 decode("\"Hello\\\" World\"")),
-    ?assertMatch({"Hello\\ World", [], {0, 14}},
-                 decode("\"Hello\\ World\"")),
-    ?assertMatch({"Hello\/ World", [], {0, 14}},
-                 decode("\"Hello\/ World\"")),
-    ?assertMatch({"Hello\b World", [], {0, 14}},
-                 decode("\"Hello\b World\"")),
-    ?assertMatch({"Hello\f World", [], {0, 14}},
-                 decode("\"Hello\f World\"")),
-    ?assertMatch({"Hello\n World", [], {1, 7}},
-                 decode("\"Hello\n World\"")),
-    ?assertMatch({"Hello\r World", [], {1, 7}},
-                 decode("\"Hello\r World\"")),
-    ?assertMatch({"Hello\t World", [], {0, 14}},
-                 decode("\"Hello\t World\"")),
-    ?assertMatch({"Hello% World", [], {0, 19}},
-                 decode("\"Hello\\u0025 World\"")).
