@@ -28,8 +28,6 @@
 %%%-------------------------------------------------------------------
 -module(ktuo_json).
 
--include("eunit.hrl").
-
 -export([decode/1, decode/3, encode/1]).
 
 %%--------------------------------------------------------------------
@@ -474,44 +472,4 @@ ident(Else, Acc, NewLines, Chars) when length(Acc) > 0 ->
     {lists:reverse(Acc), Else, {NewLines, Chars}};
 ident(_Else, _Acc, NewLines, Chars)  ->
     {error, {"Unexpected character while parsing ident", NewLines, Chars}}.
-
-
-%%=============================================================================
-%% Unit tests
-%%=============================================================================
-encode_string_test() ->
-    ?assertMatch("\"Hello\"", lists:flatten(encode({string, "Hello"}))),
-    ?assertMatch("\"hello\"", lists:flatten(encode('hello'))).
-
-encode_number_test() ->
-    ?assertMatch("430", lists:flatten(encode(430))),
-    ?assertMatch("4303432", lists:flatten(encode(4303432))),
-    ?assertMatch("4.30000000000000000000e+01", lists:flatten(encode(43.00))),
-    ?assertMatch("3.22232219999999983884e+02", 
-                 lists:flatten(encode(322.23222))).
-
-encode_array_test() ->
-    ?assertMatch("[33,43,53]", lists:flatten(encode([33, 43, 53]))),
-    ?assertMatch("[\"String\",34,\"song\"]", lists:flatten(encode([{string, 
-                                                                    "String"},
-                                                                   34, 
-                                                                   song]))),
-    ?assertMatch("[{\"Goodbye\":true,\"Hello\":44},43,54]",
-                 lists:flatten(encode([[{{string, "Hello"}, 44},
-                                        {{string, "Goodbye"}, true}],
-                                       43, 54]))).
-
-boolean_test() ->
-    ?assertMatch({true, [], {0, 4}}, value("true", 0, 0)),
-    ?assertMatch({false, [], {0, 5}}, value("false", 0, 0)).
-
-null_test() ->
-    ?assertMatch({null, [], {0, 4}}, value("null", 0, 0)).
-
-ident_test() ->
-    ?assertMatch({"Hello", [], {0, 5}}, value("Hello", 0, 0)),
-    ?assertMatch({"boo88", [], {0, 5}}, value("boo88", 0, 0)),
-    ?assertMatch({"bock", [$:], {0, 4}}, value("bock:", 0, 0)),
-    ?assertMatch({"bock", [${], {0, 4}}, value("bock{", 0, 0)),
-    ?assertMatch({"bock", [$[], {0, 4}}, value("bock[", 0, 0)).
 

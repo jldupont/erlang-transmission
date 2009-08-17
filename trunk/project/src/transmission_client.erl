@@ -100,6 +100,10 @@ loop() ->
 	loop().
 
 
+%% ADD REQUESTS BELOW
+%% ^^^^^^^^^^^^^^^^^^
+
+
 %% @spec request(ReturnDetails, session.get, _MandatoryParams, _OptionalParams) -> {session.id, SessionId} | {error, Reason}
 request(Rd, SessionId, session.get, [], []) ->
 	doreq(Rd, SessionId, get, "session-get", [], []);
@@ -109,10 +113,26 @@ request(ReturnDetails, _SessionId, session.get, M, O) ->
 	reply(ReturnDetails, {error, {unsupported_params, M, O}});
 
 
+request(Rd, SessionId, session.stats, [], []) ->
+	doreq(Rd, SessionId, get, "session-stats", [], []);
+
+
+request(Rd, SessionId, torrent.get, [], []) ->
+	doreq(Rd, SessionId, post, "torrent-get", 
+		"{"++
+			  "\"arguments\":"++
+			  		"{\"fields\":[\"id\", \"name\"]},"++
+			  "\"method\":\"torrent-get\""++
+		"}"	);
+
+
+
 %% @private
 %% catch-all
 request(ReturnDetails, _SessionId, Method, _MandatoryParams, _OptionalParams) ->
 	reply(ReturnDetails, {error, {unsupported_method, Method}}).
+
+
 
 
 
@@ -127,6 +147,10 @@ doreq(Rd, SessionId, get, Method, MandatoryParams, OpParams) ->
 	Headers=tools:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
 	do_request(get, Rd, ?TIMEOUT, Method, Req, Headers).
 
+
+doreq(Rd, SessionId, post, Method, Body) ->
+	Headers=tools:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
+	do_request(post, Rd, ?TIMEOUT, Method, Headers, "application/json", Body).
 
 
 
@@ -158,13 +182,13 @@ do_request(Type, ReturnDetails, Timeout, Method, Req, Headers) ->
 	end.
 
 %% @private
-do_request(Type, ReturnDetails, Timeout, Method, Req, Headers, ContentType, Body) ->
-	CompleteReq=?API++Req,
-	Ret = http:request(Type, {CompleteReq, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
+do_request(Type, ReturnDetails, Timeout, Method, Headers, ContentType, Body) ->
+	Ret = http:request(Type, {?API, Headers, ContentType, Body}, [{timeout, Timeout}], [{sync, false}]),
 	case Ret of
 
 		{ok, RequestId} ->
-			put({requestid, RequestId, Method}, ReturnDetails);
+			put({requestid, RequestId, Method}, ReturnDetails),
+			put({method, RequestId}, Method);
 	
 		{error, Reason} ->
 			reply(ReturnDetails, {request_error, Reason})

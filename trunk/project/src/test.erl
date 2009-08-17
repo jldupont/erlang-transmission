@@ -16,6 +16,10 @@
 		 loop/0
 		 ]).
 
+-export([
+		 t1/0
+		 ]).
+
 %%
 %% API Functions
 %%
@@ -48,9 +52,13 @@ loop() ->
 		{reply, {session_id, {_, Sid} } } ->
 			put(sid, Sid),
 			Rd=get(rd),
-			transmission_client:req(Rd, Sid, session.get, [], []);
+			transmission_client:req(Rd, Sid, torrent.get, [], []);
 		
-		{reply, Response} ->
+		{reply, {response, Response}} ->
+			Body=tools:extract(Response, body),
+			Parsed=ktuo_json:decode(Body),
+			io:format("Parsed [~p]~n", [Parsed]),
+			%%io:format("Body [~p]~n", [Body]),
 			io:format("Response [~p]~n", [Response]);
 
 		Other ->
@@ -58,3 +66,14 @@ loop() ->
 	
 	end,
 	loop().
+
+
+t1() ->
+	%%Params=[["arguments",[["fields", ["id", "name"]]]], "method=torrent-get", "tag=12345"],
+	%%Params=[{string, "arguments"},{string, "details"}],
+	%%Params=[{string, "arguments"},{string, "details"}],
+	Params={obj, [{"arguments",  {obj, [{"fields", "id"}]} 
+				   }]},
+	Ret=ktuo_json:encode(Params),
+	F=lists:flatten(Ret),
+	io:format("~s~n",[F]).
