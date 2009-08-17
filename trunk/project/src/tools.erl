@@ -95,6 +95,10 @@ gen_auth(Username, Password) ->
 	
 	
 
+url_encode(I) when is_integer(I) ->
+	S=erlang:integer_to_list(I),
+	url_encode(S);
+
 %% From YAWS
 url_encode([H|T]) ->
     if
