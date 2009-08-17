@@ -3,6 +3,12 @@
 %% Description: 
 %% TODO: configurable port
 %%
+%% status=4 -> "downloading"
+%% status=8 -> "seeding"  aka "completed"
+%%
+%% NOTES
+%%  - do not use "localhost": module HTTP barks 
+%%
 -module(transmission_client).
 
 %%
@@ -28,8 +34,7 @@
  
 -export([
 		 reply/2,
-		 loop/0,
-		 test/0
+		 loop/0
 		 ]).
 
 %%
@@ -81,7 +86,7 @@ loop() ->
 
 		{http, {RequestId, {error, Reason}}} ->
 			ReturnDetails=get({requestid, RequestId}),
-			Method=get({method, RequestId}),
+			%%Method=get({method, RequestId}),
 			erase({requestid, RequestId}),
 			erase({method, RequestId}),
 			%%io:format("got: Method[~p]~n",[Method]),
@@ -116,12 +121,16 @@ request(ReturnDetails, _SessionId, session.get, M, O) ->
 request(Rd, SessionId, session.stats, [], []) ->
 	doreq(Rd, SessionId, get, "session-stats", [], []);
 
+%% Remove 1 torrent
+request(Rd, SessionId, torrent.remove, Id, []) ->
+	doreq(Rd, SessionId, get, "torrent-remove", [{"ids", Id}], []);
 
+%% Retrieves some parameters associated with *all* active torrents
 request(Rd, SessionId, torrent.get, [], []) ->
 	doreq(Rd, SessionId, post, "torrent-get", 
 		"{"++
 			  "\"arguments\":"++
-			  		"{\"fields\":[\"id\", \"name\"]},"++
+			  		"{\"fields\":[\"id\", \"name\", \"status\",\"files\", \"downloadDir\"]},"++
 			  "\"method\":\"torrent-get\""++
 		"}"	);
 
@@ -187,7 +196,7 @@ do_request(Type, ReturnDetails, Timeout, Method, Headers, ContentType, Body) ->
 	case Ret of
 
 		{ok, RequestId} ->
-			put({requestid, RequestId, Method}, ReturnDetails),
+			put({requestid, RequestId}, ReturnDetails),
 			put({method, RequestId}, Method);
 	
 		{error, Reason} ->
@@ -209,24 +218,21 @@ reply({From, Context}, Message) ->
 
 hresponse(Rid, Result) ->
 	Rd=get({requestid, Rid}),
+	%%io:format("hresponse: rd: ~p~n", [Rd]),	
 	Method=get({method, Rid}),
 	erase({requestid, Rid}),
 	erase({method, Rid}),
 	Code=tools:extract(Result, http.code),
 	Headers=tools:extract(Result, headers),
-	hr(Rid, Rd, Method, Result, Code, Headers).
+	Body=tools:extract(Result, body),
+	hr(Rid, Rd, Method, Result, Code, Headers, Body).
 
 
-hr(_Rid, Rd, _Method, _Result, 409, Headers) ->
+hr(_Rid, Rd, _Method, _Result, 409, Headers, _) ->
 	Sid=tools:kfind("x-transmission-session-id", Headers, not_found),
 	reply(Rd, {session_id, Sid});
 
-hr(Rid, Rd, Method, Result, Code, Headers) ->
-	reply(Rd, {response, Result}).
+hr(_Rid, Rd, _Method, _Result, Code, Headers, Body) ->
+	reply(Rd, {response, Code, Headers, Body}).
 
 
-
-
-test() ->
-	start(),
-	req(undefined, "", session.get, [], []).

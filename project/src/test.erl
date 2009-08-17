@@ -46,20 +46,18 @@ loop() ->
 		
 		start ->
 			Rd={self(), reply},
-			put(rd, Rd),
 			transmission_client:req(Rd, "", session.get, [], []);
 
 		{reply, {session_id, {_, Sid} } } ->
 			put(sid, Sid),
-			Rd=get(rd),
+			Rd={self(), reply},
 			transmission_client:req(Rd, Sid, torrent.get, [], []);
 		
-		{reply, {response, Response}} ->
-			Body=tools:extract(Response, body),
-			Parsed=ktuo_json:decode(Body),
-			io:format("Parsed [~p]~n", [Parsed]),
-			%%io:format("Body [~p]~n", [Body]),
-			io:format("Response [~p]~n", [Response]);
+		{reply, {response, Code, Headers, Body}} ->
+			List=erlang:binary_to_list(Body),
+			{ok, Parsed}=json:decode_string(List),
+			io:format("Parsed [~p]~n", [Parsed]);
+			%%io:format("Body [~p]~n", [Body]);
 
 		Other ->
 			io:format("Other [~p]~n", [Other])
