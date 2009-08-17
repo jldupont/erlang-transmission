@@ -18,7 +18,8 @@
 		 make_node/2,
 		 to_string/1,
 		 kfind/2,
-		 kfind/3
+		 kfind/3,
+		 cond_add_to_list/3
 		 ]).
 
 -export([
@@ -257,12 +258,17 @@ kfind(Key, [], Default) ->
 	{Key, Default};
 
 kfind(Key, List, Default) ->
-	Ret=base:kfind(Key, List),
+	Ret=tools:kfind(Key, List),
 	case Ret of
 		false ->
 			{Key, Default};
 		{Key, Value} ->
-			{Key, Value}
+			{Key, Value};
+		{} ->
+			{Key, Default};
+		Other ->
+			io:format("~p:kfind: other[~p]~n",[?MODULE, Other]),
+			Other
 	end.
 
 
@@ -298,3 +304,15 @@ extract(Result, http.code.text) ->
 	{{_Version, _Code, CodeText}, _Headers, _Body} = Result,
 	CodeText.
 	
+
+
+%% Conditionally add a tuple to a list
+%% Value = list() | atom() | string()
+cond_add_to_list(Key, Value, List) when length(Value) > 0 ->
+	List++[{Key, Value}];
+
+cond_add_to_list(_Key, _Value, List) ->
+	List.
+
+
+
