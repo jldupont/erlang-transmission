@@ -16,6 +16,8 @@
 %%
 -define(API, "http://127.0.0.1:9091/transmission/rpc").
 -define(TIMEOUT, 2000).
+-define(TOOLS, transmission_tools).
+
 
 %%
 %% Exported Functions
@@ -151,14 +153,14 @@ request(ReturnDetails, _SessionId, Method, _MandatoryParams, _OptionalParams) ->
 %% @private
 doreq(Rd, SessionId, get, Method, MandatoryParams, OpParams) ->
 	Params=[{"method", Method}]++lists:append(MandatoryParams, OpParams),
-	PL=tools:encode_list(Params),
-	Req=tools:format_encoded_list(PL),
-	Headers=tools:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
+	PL=?TOOLS:encode_list(Params),
+	Req=?TOOLS:format_encoded_list(PL),
+	Headers=?TOOLS:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
 	do_request(get, Rd, ?TIMEOUT, Method, Req, Headers).
 
 
 doreq(Rd, SessionId, post, Method, Body) ->
-	Headers=tools:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
+	Headers=?TOOLS:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
 	do_request(post, Rd, ?TIMEOUT, Method, Headers, "application/json", Body).
 
 
@@ -222,14 +224,14 @@ hresponse(Rid, Result) ->
 	Method=get({method, Rid}),
 	erase({requestid, Rid}),
 	erase({method, Rid}),
-	Code=tools:extract(Result, http.code),
-	Headers=tools:extract(Result, headers),
-	Body=tools:extract(Result, body),
+	Code=?TOOLS:extract(Result, http.code),
+	Headers=?TOOLS:extract(Result, headers),
+	Body=?TOOLS:extract(Result, body),
 	hr(Rid, Rd, Method, Result, Code, Headers, Body).
 
 
 hr(_Rid, Rd, _Method, _Result, 409, Headers, _) ->
-	Sid=tools:kfind("x-transmission-session-id", Headers, not_found),
+	Sid=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
 	reply(Rd, {session_id, Sid});
 
 hr(_Rid, Rd, _Method, _Result, Code, Headers, Body) ->
