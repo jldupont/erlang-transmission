@@ -1,10 +1,24 @@
 #!/usr/bin/env python
-#
+### BEGIN INIT INFO
+# Provides:          etwitter
+# Required-Start:    
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start daemon at boot time
+# Description:       Enable service provided by daemon.
+### END INIT INFO
 """
 	Erlang-transmission daemon control
 	
 	@author Jean-Lou Dupont
 """
+
+# Customize here
+name="transmission"
+# ^^^^^^^^^^^^^^
+
+
 import os
 import sys
 import subprocess
@@ -12,58 +26,110 @@ from optparse import OptionParser
 
 class Commands(object):
 	
-	cmdStart  = "erl -pa %s -detached -sname transmission -run transmission_daemon start"
-	cmdStop   = "escript etrx_control -q stop"
-	cmdStatus = "escript etrx_control -q status"	
+	cmdStart  = "erl -pa %(cmd)s -detached -sname %(name)s -run %(name)s_app start"
+	
+	#probably need to put the "escript" for development purpose...
+	#windows shared drive do not play well with file mod flags...
+	cmdStop   = "%s_control -q stop"
+	cmdStatus = "%s_control -q status"
+	cmdReload = "%s_control -q reload"
 	
 	dostart  = "starting daemon"
 	nodaemon = "cannot start daemon"
 	nostop   = "cannot stop daemon"
 	canstop  = "ok"
 	
-	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart  },
-				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop,  "start":dostart  }, 
-				2: {"msg":"daemon found",      "canstart": False, "stop":nostop,  "start":nodaemon }, 
-				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop,  "start":dostart  }, 
-				4: {"msg":"library not found", "canstart": False, "stop":nostop,  "start":nodaemon },
-				5: {"msg":"node not found",    "canstart": True,  "stop":nostop,  "start":dostart  },
+	# "status" field according to LSB-Core-generic specification
+	
+	codes = {	0: {"msg":"ok",                "canstart": True,  "stop":canstop, "start":dostart,  "status":4  },
+				1: {"msg":"unspecified error", "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  }, 
+				2: {"msg":"daemon found",      "canstart": False, "stop":canstop, "start":nodaemon, "status":0 }, 
+				3: {"msg":"daemon not found",  "canstart": True,  "stop":nostop,  "start":dostart,  "status":3  }, 
+				4: {"msg":"library not found", "canstart": False, "stop":nostop,  "start":nodaemon, "status":4 },
+				5: {"msg":"node not found",    "canstart": True,  "stop":nostop,  "start":dostart,  "status":4  },
 			}
 	
-	def cmd_start(self, fb):
+	def __init__(self, feedback=True, verbose=False):
+		self.name = globals()["name"]
+		self.verbose = verbose
+		self.feedback=feedback
+	
+	def cmd_start(self):
 		ctx=self._canStart()
-		if fb:
-			print "etrx: %s [%s]\n" % (ctx["start"], ctx["msg"])
+		self._msg(ctx, "start")
+
 		if not ctx["canstart"]:
 			sys.exit(1)
 
 		self._dostart()
 		sys.exit(0)	
 		
-	def cmd_stop(self, feedback):
-		self._dostop(feedback)
+	def cmd_stop(self):
+		ctx=self._dostop()
+		self._msg(ctx, "stop")
+		
+	
+	def cmd_restart(self):
+		self.cmd_stop()
+		self.cmd_start()
+		
+	def cmd_reload(self):
+		ctx=self.doreload()
+		if self.feedback:
+			print "%s: [%s]\n" % (self.name, ctx["msg"])
+		sys.exit(ctx["status"])
+		
+	def cmd_status(self):
+		ctx=self._canStart()
+		if self.feedback:
+			print "%s: [%s]\n" % (self.name, ctx["msg"])
+		sys.exit(ctx["status"])
+
+	
+	def cmd_check(self):
+		pass
+	
+	
+	## =-----------------------------------------------------=- ##
+	
+	
+	def _msg(self, ctx, cmd):
+		if self.feedback:
+			if self.verbose:
+				print "%s: %s [%s]\n" % (name, ctx[cmd], ctx["msg"])
+			else:
+				print "%s: %s\n" % (name, ctx[cmd])
+	
 	
 	def _dostart(self):
 	
 		#add development path
 		cwd=os.getcwd()
-		cmd=self.cmdStart % (cwd+"/ebin")
+		params={"name":self.name, "cmd":cwd+"/ebin"}
+		cmd=self.cmdStart % params
 		proc = subprocess.Popen(cmd, shell=True)
 		return proc.wait()
 		
-	def _dostop(self, fb):
-		proc = subprocess.Popen(self.cmdStop, shell=True)
+	def _dostop(self):
+		proc = subprocess.Popen(self.cmdStop % self.name, shell=True)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)
-		if fb:
-			print "etrx: %s [%s]\n" % (ctx["stop"], ctx["msg"])
+		return ctx
+
+	def _doreload(self):
+		proc = subprocess.Popen(self.cmdReload % self.name, shell=True)
+		proc.wait()
+		ret=proc.returncode
+		ctx=self._getCtx(ret)
+		return ctx
 
 	def _getCtx(self, code):
 		ctx=self.codes.get(code, self.codes[1])
 		return ctx			
 
 	def _canStart(self):
-		proc = subprocess.Popen(self.cmdStatus, shell=True)
+		proc = subprocess.Popen(self.cmdStatus % self.name, shell=True)
 		proc.wait()
 		ret=proc.returncode
 		ctx=self._getCtx(ret)
@@ -72,10 +138,14 @@ class Commands(object):
 	
 
 def main():
-	usage= """etrx [-q] [start|stop] 
-"""
+	usage= """%s [-q] [start|stop|status|check] 
+""" % name
 	
 	parser=OptionParser(usage)
+	parser.add_option("-v", "--verbose",
+                  action="store_true", dest="verbose", default=False,
+                  help="print additional information stdout")
+	
 	parser.add_option("-q", "--quiet",
                   action="store_false", dest="feedback", default=True,
                   help="don't print status messages to stdout")
@@ -87,13 +157,18 @@ def main():
       
 	cmd = args[0]
 	feedback = options.feedback
+	verbose  = options.verbose
 	
 	try:
-		getattr(Commands(), "cmd_"+cmd)(feedback)
+		getattr(Commands(feedback, verbose), "cmd_"+cmd)()
 	except Exception, e:
-		##print "Exception [%s]\n" % e
+		#print "Exception [%s]\n" % e
 		print "! invalid command [%s]\n" % cmd
 
 	
 if __name__=="__main__":
+
+	# for our dev environment
+	PATH=os.getenv("PATH")
+	os.putenv("PATH", ".:"+PATH)
 	main()
