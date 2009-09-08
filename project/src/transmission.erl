@@ -18,13 +18,14 @@
 -define(TOOLS,      mswitch_tools).
 -define(CTOOLS,     mswitch_ctools).
 -define(RPC,        transmission_rpc).
+-define(DAEMON_RPC_TIMEOUT, 2000).
 
 
 %%
 %% Exported Functions
 %%
 -export([
-		 start_link/1,
+		 start_link/0,
 		 stop/0,
 		 
 		 %% API
@@ -34,20 +35,17 @@
 	    ,blacklist/0
 	   
 		,daemon_api/2
-		,req/4
 		 ]).
 
 -export([
-		 loop/1, 
-		 reply/2,
-		 doreq/4
+		 loop/0 
 		 ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions - not really part of API per-se
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link(Args) ->
-	Pid=spawn_link(?MODULE, loop, [Args]),
+start_link() ->
+	Pid=spawn_link(?MODULE, loop, []),
 	register(?SERVER, Pid),
 	%io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
 	{ok, Pid}.
@@ -57,37 +55,12 @@ stop() -> ?SERVER ! stop.
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% RPC Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-daemon_api(status) ->
-	{pid, os:getpid()};
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON RPC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
 
-daemon_api(reload) ->
-	?SWITCH:publish(sys, reload);
-
-daemon_api(Cmd) ->
-	{command_invalid, Cmd}.
-
-
-
-req(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
-	rpc({request, ReplyDetails, Method, MandatoryParams, OptionalParams}).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ADMIN API Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_server() ->	?SERVER.
-get_busses() -> ?BUSSES.
-
-
-
-%% ----------------------                   ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------                   ------------------------------
-
-
+%% Messages are sent to the server loop in this module
+%%
 daemon_api(ReplyContext, Command) ->
 	case ?RPC:rpc_validate_command(Command) of
 		true ->
@@ -98,13 +71,29 @@ daemon_api(ReplyContext, Command) ->
 	end.
 
 
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ADMIN API Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
+
+
 
 
 
 %% ----------------------              ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%% SERVER LOOP  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------              ------------------------------
-loop(Args) ->
+loop() ->
 	receive
 		
 		%% RPC bridge
@@ -116,6 +105,8 @@ loop(Args) ->
 			?RPC:handle_rpc(ReplyTo, FromNode, ReplyContext, Q);
 	
 		
+		%%%% CONFIGURATION MANAGEMENT
+		
 		{config, Version, Config} ->
 			?CTOOLS:put_config(Version, Config);
 		
@@ -123,17 +114,21 @@ loop(Args) ->
 			exit(normal);
 	
 		%%% LOCAL SWITCH RELATED %%%
+		%%% --------------------
 		{hwswitch, From, Bus, Msg} ->
 			handle({hwswitch, From, Bus, Msg});
 
 		
+		%%% TRANSMISSION API related
+		%%% ------------------------
 		{http, {RequestId, {error, Reason}}} ->
-			ReturnDetails=get({requestid, RequestId}),
+			%ReturnDetails=get({requestid, RequestId}),
 			%%Method=get({method, RequestId}),
 			erase({requestid, RequestId}),
 			erase({method, RequestId}),
 			%%io:format("got: Method[~p]~n",[Method]),
-			reply(ReturnDetails, {error, Reason});
+			handle_api_error(Reason);
+			
 
 		
 		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
@@ -143,26 +138,74 @@ loop(Args) ->
 		%% Headers = {key, value}, {key, value} ...
 		%% ResponseBody = string()
 		{http, {RequestId, Result}} ->
-			?CLIENT:hresponse(RequestId, Result)
+			handle_api_response(RequestId, Result);
 
 	
+		poll.timer.expired ->
+			do_polling();
+		
+		_Other ->
+			log(critical, "unhandled message: ", [_Other])
+	
 	end,
-	loop(Args).
-
-
-
-%% @private
-reply(undefined, Message) ->
-	io:format("~p:reply(~p)~n", [?MODULE, Message]),
-	Message;
-
-%% @private
-reply({From, Context}, Message) ->
-	From ! {Context, Message}.
-
+	loop().
 
 
 %% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%    API     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
+handle_api_error(Reason) ->
+	State=get(request.state),
+	handle_api_error(State, Reason).
+
+%% The BT transmission is probably off-line
+handle_api_error(success, Reason) ->
+	put(request.state, error),
+	clog(api.error, error, "Request error, reason: ", [Reason]);
+
+%% Squelch repeating errors
+handle_api_error(error, _Reason) ->
+	ok.
+
+
+
+handle_api_response(Rid, Result) ->
+	%% for squelching functionality
+	put(request.state, success),
+	
+	Rd=get({requestid, Rid}),
+	%%io:format("hresponse: rd: ~p~n", [Rd]),	
+	Method=get({method, Rid}),
+	erase({requestid, Rid}),
+	erase({method, Rid}),
+	Code=?TOOLS:http_extract(Result, http.code),
+	Headers=?TOOLS:http_extract(Result, headers),
+	Body=?TOOLS:http_extract(Result, body),
+	hr(Rid, Rd, Method, Result, Code, Headers, Body).
+
+
+%% Grab the session Id for future requests
+hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
+	Sid=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
+	io:format("got session.id<~p>~n", [Sid]),
+	put(session.id, Sid);
+
+
+hr(_Rid, _Rd, _Method, _Result, Code, _Headers, Body) ->
+	io:format("response: code<~p> body<~p>~n", [Code, Body]).
+
+
+%% poll for status of Torrents
+%%
+do_polling() ->
+	SessionId=get(session.id),
+	?CLIENT:request(undefined, SessionId, torrent.get, [], []).
+
+
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HWSWITCH  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------            ------------------------------
 
@@ -174,6 +217,9 @@ handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
 
 handle({hwswitch, _From, clock, _}) ->
 	not_supported;
+
+handle({hwswitch, _From, sys, app.ready}) ->
+	do_app_ready();
 
 
 handle({hwswitch, _From, sys, suspend}) ->
@@ -205,6 +251,27 @@ handle(Other) ->
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
+do_app_ready() ->
+	TRef=get(polling.timer),
+	set_timer(TRef).
+
+set_timer(TRef) ->
+	%% won't crash even on 'undefined'
+	timer:cancel(TRef),
+	Poll=get(transmission.poll.interval),
+	Result=timer:send_interval(Poll, poll.timer.expired),
+	case Result of
+		{error, Reason} ->
+			log(critical, "cannot initialize polling timer, reason: ", [Reason]);
+		{ok, TRef} ->
+			put(polling.timer, TRef)
+	end.
+
+		
+
+
+
+
 set_state(State) ->
 	put(state, State).
 
@@ -216,32 +283,6 @@ set_state(State) ->
 %		_         -> suspended
 %	end.
 
-
-
-doreq(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
-	reply(ReplyDetails, request_done).
-
-
-
-
-hresponse(Rid, Result) ->
-	Rd=get({requestid, Rid}),
-	%%io:format("hresponse: rd: ~p~n", [Rd]),	
-	Method=get({method, Rid}),
-	erase({requestid, Rid}),
-	erase({method, Rid}),
-	Code=?TOOLS:http_extract(Result, http.code),
-	Headers=?TOOLS:http_extract(Result, headers),
-	Body=?TOOLS:http_extract(Result, body),
-	hr(Rid, Rd, Method, Result, Code, Headers, Body).
-
-
-hr(_Rid, Rd, _Method, _Result, 409, Headers, _) ->
-	Sid=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
-	reply(Rd, {session_id, Sid});
-
-hr(_Rid, Rd, _Method, _Result, Code, Headers, Body) ->
-	reply(Rd, {response, Code, Headers, Body}).
 
 
 
