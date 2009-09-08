@@ -27,6 +27,7 @@
 		request/5 
 		,decode/1
 		,extract/2
+		,extract/3
 		]).
 
  
@@ -150,48 +151,11 @@ do_request(Type, ReturnDetails, Timeout, Method, Headers, ContentType, Body) ->
 
 
 
-%% ----------------------           ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------           ------------------------------
-decode(S) ->
-	try
-		L=erlang:binary_to_list(S),
-		?JSON:decode_string(L)
-	catch
-		_:_ ->
-			error
-	end.
-
-extract(JS, top) ->
-	io:format("extracting from: ~p~n~n~n", [JS]),
-	try
-		{struct, Top}=JS,
-		Top
-	catch
-		_:_ -> error
-	end;
 
 
-extract(JS, arguments) ->
-	io:format("arguments: extracting from: ~p~n~n~n", [JS]),
-	try
-		{struct, Top}=JS,
-		[{arguments, Arguments}] = Top,
-		Arguments
-	catch
-		_:_ -> error
-	end;
-
-
-extract(JS, torrents) ->
-	io:format("extracting from: ~p~n~n~n", [JS]),
-	try
-		{struct, [{arguments, {struct, Torrents},_,_,_}]
-		}=JS,
-		Torrents
-	catch
-		_:_ -> error
-	end.
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  EXAMPLES  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
 
 
 
@@ -213,6 +177,66 @@ decoded: body<{ok,
                               {name,
                                \"Within Temptation - Destroyed[2008] [MP3]-RoCK&BlueLadyRG/01 Destroyed.mp3\"}]},
 ".
+
+'example.session.get'() ->
+	"{struct,
+                  [{arguments,
+                       {struct,
+                           [{'alt-speed-down',50},
+                            {'alt-speed-enabled',false},
+                            {'alt-speed-time-begin',540},
+                            {'alt-speed-time-day',127},
+                            {'alt-speed-time-enabled',false},
+                            {'alt-speed-time-end',1020},
+                            {'alt-speed-up',50},
+                            {'blocklist-enabled',true},
+                            {'blocklist-size',223996},
+                            {'dht-enabled',true},
+                            {'download-dir',\"/home/jldupont\"},
+                            {encryption,\"preferred\"},
+                            {'peer-limit-global',240},
+                            {'peer-limit-per-torrent',60},
+                            {'peer-port',51413},
+                            {'peer-port-random-on-start',0},
+                            {'pex-enabled',true},
+                            {'port-forwarding-enabled',true},
+                            {'rpc-version',6},
+                            {'rpc-version-minimum',1},
+                            {seedRatioLimit,2.0},
+                            {seedRatioLimited,false},
+                            {'speed-limit-down',100},
+                            {'speed-limit-down-enabled',false},
+                            {'speed-limit-up',1},
+                            {'speed-limit-up-enabled',true},
+                            {version,\"1.74 (8994)\"}]}},
+                   {result,\"success\"}]}".
+
+
+'example.session.stats'() ->
+"{struct,
+                  [{arguments,
+                       {struct,
+                           [{activeTorrentCount,1},
+                            {'cumulative-stats',
+                                {struct,
+                                    [{downloadedBytes,2674109234},
+                                     {filesAdded,226},
+                                     {secondsActive,339248},
+                                     {sessionCount,7},
+                                     {uploadedBytes,115315123}]}},
+                            {'current-stats',
+                                {struct,
+                                    [{downloadedBytes,188803262},
+                                     {filesAdded,20},
+                                     {secondsActive,4535},
+                                     {sessionCount,1},
+                                     {uploadedBytes,3929074}]}},
+                            {downloadSpeed,0},
+                            {pausedTorrentCount,0},
+                            {torrentCount,1},
+                            {uploadSpeed,1024}]}},
+                   {result,\"success\"}]}".
+
 
 
 %% ----------------------           ------------------------------
@@ -252,3 +276,79 @@ cond_add_to_list(Key, Value, List) when length(Value) > 0 ->
 
 cond_add_to_list(_Key, _Value, List) ->
 	List.
+
+
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+decode(S) ->
+	try
+		L=erlang:binary_to_list(S),
+		?JSON:decode_string(L)
+	catch
+		_:_ ->
+			error
+	end.
+
+extract(JS, top) ->
+	%io:format("extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, Top}=JS,
+		Top
+	catch
+		_:_ -> error
+	end;
+
+
+extract(JS, arguments) ->
+	%io:format("arguments: extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, Top}=JS,
+		[{arguments, Arguments}|_Rest] = Top,
+		Arguments
+	catch
+		_:_ -> error
+	end;
+
+
+extract(JS, torrents) ->
+	%io:format("torrents: extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, [{torrents, {array, Torrents}}|_Rest]}=JS,
+		Torrents
+	catch
+		_:_ -> error
+	end;
+
+extract(Torrent, files) ->
+	io:format("files: extracting from: ~p~n~n~n", [Torrent]),
+	try
+		{struct, List}=Torrent,
+		{_, FilesArray}=?TOOLS:kfind(files, List),
+		{array, Files} = FilesArray,
+		Files
+	catch
+		_:_ -> error
+	end;
+
+
+extract(Torrent, download.dir) ->
+	try
+		{struct, List}=Torrent,
+		{_, DL}=?TOOLS:kfind(downloadDir, List),
+		DL
+	catch
+		_:_ -> error
+	end.
+
+
+
+extract(torrent, Torrent, Var) ->
+	try
+		{struct, List}=Torrent,
+		{_, VarValue}=?TOOLS:kfind(Var, List),
+		VarValue
+	catch
+		_:_ -> error
+	end.
+

@@ -197,17 +197,56 @@ hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
 	maybe_grab_sid(Result);
 
 
+hr(_Rid, _Rd, "torrent-get", _Result, _Code, _Headers, Body) ->
+	try
+		{ok, D}=?CLIENT:decode(Body),
+		A=?CLIENT:extract(D, arguments),
+		Torrents=?CLIENT:extract(A, torrents),
+		process_torrents(Torrents)
+	catch
+		X:Y ->
+			io:format("X<~p> Y<~p>~n", [X,Y]),
+			error
+	end;
 
-hr(_Rid, _Rd, _Method, _Result, Code, _Headers, Body) ->
-	{ok, D}=?CLIENT:decode(Body),
-	%io:format("decoded: body<~p>~n~n~n", [D]),
+
+hr(_Rid, _Rd, Method, _Result, _Code, _Headers, _Body) ->
+	log(error, "unhandled method: ", [Method]).
+	%{ok, D}=?CLIENT:decode(Body),
+	%io:format("decoded: body<~p>~n~n~n", [D]).
 	%io:format("response: code<~p> body<~p>~n~n~n", [Code, Body]).
-	%T=?CLIENT:extract(D, torrents),
-	A=?CLIENT:extract(D, arguments),
+	
+	%A=?CLIENT:extract(D, arguments),
+	%T=?CLIENT:extract(A, torrents),
+	%F=?CLIENT:extract(T, files),
 	%Top=?CLIENT:extract(D, top),
 	%io:format("Top: ~p~n~n", [Top]).
-	io:format("Arguments: ~p~n~n", [A]).
+	%io:format("Arguments: ~p~n~n", [A])
 	%io:format("torrents: ~p~n~n", [T]).
+	%io:format("files: ~p~n~n", [F]).
+	%[H|_R]=T,
+	%Name=?CLIENT:extract(torrent, H, name),
+	%io:format("torrent name: ~p~n", [Name]).
+
+
+process_torrents(Torrents) when is_list(Torrents), length(Torrents)>0 ->
+	[Torrent|Rest]=Torrents,
+	Name=?CLIENT:extract(torrent, Torrent, name),
+	Id=?CLIENT:extract(torrent, Torrent, id),
+	Status=?CLIENT:extract(torrent, Torrent, status),
+	io:format("torrent: name<~p> id<~p> status<~p> ~n~n", [Name, Id, Status]),
+	process_torrents(Rest);
+
+
+process_torrents([]) ->
+	ok;
+
+process_torrents(_) ->
+	nothing_todo.
+
+
+
+
 
 maybe_grab_sid({_, Sid}) ->
 	clog(api.session.id, info, "session id: ", [Sid]),
