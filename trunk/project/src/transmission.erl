@@ -5,7 +5,7 @@
 %% Session-id:  recovered when 409 HTTP code received
 %%
 
--module(transmission_daemon).
+-module(transmission).
 
 %%
 %% Defines
@@ -13,12 +13,14 @@
 -define(SERVER, transmission).
 -define(SWITCH, transmission_hwswitch).
 -define(BUSSES, []).
+-define(RPCTIMEOUT, 2000).
+
 
 %%
 %% Exported Functions
 %%
 -export([
-		 start_link/0,
+		 start_link/1,
 		 stop/0,
 		 
 		 %% API
@@ -27,12 +29,11 @@
 	    ,defaults/0
 	    ,blacklist/0
 	   
-		,api/1
+		,daemon_api/1
 		,req/4
 		 ]).
 
 -export([
-		 dostart/1,
 		 loop/1, 
 		 rpc/1,
 		 reply/2,
@@ -42,22 +43,27 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions - not really part of API per-se
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link() ->
-	dostart([]).
+start_link(Args) ->
+	Pid=spawn_link(?MODULE, loop, [Args]),
+	register(?SERVER, Pid),
+	%io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
+	{ok, Pid}.
+
 
 stop() -> ?SERVER ! stop.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% RPC Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-api(status) ->
+daemon_api(status) ->
 	{pid, os:getpid()};
 
-api(reload) ->
-	ok;
+daemon_api(reload) ->
+	?SWITCH:publish(sys, reload);
 
-api(Cmd) ->
+daemon_api(Cmd) ->
 	{command_invalid, Cmd}.
 
 
@@ -86,25 +92,22 @@ rpc(Q) ->
 			Reply;
 	
 		Other ->
-			error_logger:error_msg("~p rpc: received [~p]~n", [?MODULE, Other]),
-			rpcerror
+			clog(daemon_api, error, "~p rpc: received [~p]~n", [[?MODULE, Other]]),
+			{error, rpcerror}
 	
-	after 2000 ->
+	after ?RPCTIMEOUT ->
 			
-			io:format("~p: rpc timeout~n",[?MODULE]),
-			rpcerror
+			%io:format("~p: rpc timeout~n",[?MODULE]),
+			{error, rpcerror}
 	end.
 
 
-dostart(Args) ->
-	Pid=spawn_link(?MODULE, loop, [Args]),
-	register(?SERVER, Pid),
-	%io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
-	{ok, Pid}.
 
 
-
-
+%% @private
+%% 
+%% Server loop
+%%
 loop(Args) ->
 	receive
 		
@@ -149,8 +152,8 @@ log(Severity, Msg, Params) ->
 clog(Ctx, Sev, Msg) ->
 	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
 
-%clog(Ctx, Sev, Msg, Ps) ->
-%	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
+clog(Ctx, Sev, Msg, Ps) ->
+	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
