@@ -193,13 +193,22 @@ handle_api_response(Rid, Result) ->
 
 %% Grab the session Id for future requests
 hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
-	Sid=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
-	io:format("got session.id<~p>~n", [Sid]),
-	put(session.id, Sid);
+	Result=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
+	maybe_grab_sid(Result);
+
 
 
 hr(_Rid, _Rd, _Method, _Result, Code, _Headers, Body) ->
 	io:format("response: code<~p> body<~p>~n", [Code, Body]).
+
+maybe_grab_sid({_, Sid}) ->
+	clog(api.session.id, info, "session id: ", [Sid]),
+	%io:format("got session.id<~p>~n", [Sid]),
+	put(session.id, Sid);
+
+maybe_grab_sid(_) ->
+	ok.
+
 
 
 %% poll for status of Torrents
