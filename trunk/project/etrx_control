@@ -133,7 +133,7 @@ rpc(Command) ->
 dorpc(Message) ->
 	Node=make_node(transmission),
 	
-	case rpc:call(Node, transmission_daemon, api, [Message], 2000) of
+	case rpc:call(Node, transmission, daemon_api, [Message], 2000) of
 		{badrpc, _Reason} ->
 			rpcerror;
 		

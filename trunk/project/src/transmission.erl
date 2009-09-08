@@ -10,10 +10,12 @@
 %%
 %% Defines
 %%
--define(SERVER, transmission).
--define(SWITCH, transmission_hwswitch).
--define(BUSSES, []).
+-define(SERVER,     transmission).
+-define(SWITCH,     transmission_hwswitch).
+-define(BUSSES,     []).
 -define(RPCTIMEOUT, 2000).
+-define(CLIENT,     transmission_client).
+-define(TOOLS,      mswitch_tools).
 
 
 %%
@@ -114,8 +116,24 @@ loop(Args) ->
 		stop ->
 			exit(ok);
 	
-		{request, ReplyDetails, Method, MandatoryParams, OptionalParams} ->
-			doreq(ReplyDetails, Method, MandatoryParams, OptionalParams)
+		{http, {RequestId, {error, Reason}}} ->
+			ReturnDetails=get({requestid, RequestId}),
+			%%Method=get({method, RequestId}),
+			erase({requestid, RequestId}),
+			erase({method, RequestId}),
+			%%io:format("got: Method[~p]~n",[Method]),
+			reply(ReturnDetails, {error, Reason});
+
+		
+		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+		%% HttpVersion = string()         (eg. "HTTP/1.1")
+		%% HttpCode = integer()           (eg. "200")
+		%% HttpResponseCode = string()    (eg. "OK")
+		%% Headers = {key, value}, {key, value} ...
+		%% ResponseBody = string()
+		{http, {RequestId, Result}} ->
+			?CLIENT:hresponse(RequestId, Result)
+
 	
 	end,
 	loop(Args).
@@ -136,6 +154,30 @@ reply({From, Context}, Message) ->
 
 doreq(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
 	reply(ReplyDetails, request_done).
+
+
+
+
+hresponse(Rid, Result) ->
+	Rd=get({requestid, Rid}),
+	%%io:format("hresponse: rd: ~p~n", [Rd]),	
+	Method=get({method, Rid}),
+	erase({requestid, Rid}),
+	erase({method, Rid}),
+	Code=?TOOLS:http_extract(Result, http.code),
+	Headers=?TOOLS:http_extract(Result, headers),
+	Body=?TOOLS:http_extract(Result, body),
+	hr(Rid, Rd, Method, Result, Code, Headers, Body).
+
+
+hr(_Rid, Rd, _Method, _Result, 409, Headers, _) ->
+	Sid=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
+	reply(Rd, {session_id, Sid});
+
+hr(_Rid, Rd, _Method, _Result, Code, Headers, Body) ->
+	reply(Rd, {response, Code, Headers, Body}).
+
+
 
 
 
@@ -171,5 +213,11 @@ blacklist() ->
 %% @spec defaults() -> list()
 %%
 defaults() ->
-	[].
+	[
+	 %% Priority level for messages sent on the 'notif' bus through Mswitch
+	 {transmission.notif.priority,  optional, int,  2}
+	
+	%% Write a '.completed' file when a download is finished
+	,{transmission.write.completed, optional, atom, true}
+	 ].
 
