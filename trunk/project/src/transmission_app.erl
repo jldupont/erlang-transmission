@@ -32,7 +32,7 @@ loop() ->
 			%% Start 'inets' before anything or else
 			%% the whole system does not want to start
 			inets:start(),
-			transmission_sup:start_link();
+			{ok, Pid} = transmission_sup:start_link();
 		
 		stop ->
 			exit(normal)

@@ -56,7 +56,7 @@ init(_Args) ->
 	CF_Modules = [Logger, AppCtl, App ],
 	
 
-    Child_logger = {Logger,{Logger, start_link,[{logfilename, "/var/log/twitter.log"}]},
+    Child_logger = {Logger,{Logger, start_link,[{logfilename, "/var/log/transmission.log"}]},
 	      permanent,2000,worker,[Logger]},
 	
     Child_switch = {Hwswitch,{Hwswitch, start_link,[mods, HS_Modules]},
