@@ -17,8 +17,6 @@
 		 make_node/1,
 		 make_node/2,
 		 to_string/1,
-		 kfind/2,
-		 kfind/3,
 		 cond_add_to_list/3
 		 ]).
 
@@ -46,10 +44,6 @@
 %%
 %% API Functions
 %%
-is_running(Node) ->
-	Regs = erlang:registered(),
-	lists:member(Node, Regs).
-
 
 
 extract_host() ->
@@ -232,10 +226,6 @@ format_encoded_list(Liste) ->
 	"?"++Liste.
 
 
-
-kfind(_Key, []) ->
-	{};
-
 %% Searches through a list for a Key
 %% Returns {} if not found or {Key, Value} otherwise
 kfind(Key, List) ->
@@ -257,23 +247,6 @@ kfind(Key, List) ->
 			end
 	end.
 
-%% Returns {Key, Default} if not found or {Key, Value} otherwise
-kfind(Key, [], Default) ->
-	{Key, Default};
-
-kfind(Key, List, Default) ->
-	Ret=tools:kfind(Key, List),
-	case Ret of
-		false ->
-			{Key, Default};
-		{Key, Value} ->
-			{Key, Value};
-		{} ->
-			{Key, Default};
-		Other ->
-			io:format("~p:kfind: other[~p]~n",[?MODULE, Other]),
-			Other
-	end.
 
 
 
