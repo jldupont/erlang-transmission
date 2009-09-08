@@ -36,11 +36,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions - not really part of API per-se
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start() ->	dostart([start]).
-
-start([]) -> dostart([start]);
-
-start(Args) ->	dostart(Args).
+start()     -> dostart([start]).
+start([])   -> dostart([start]);
+start(Args) -> dostart(Args).
 
 stop() -> ?SERVER ! stop.
 
@@ -89,10 +87,9 @@ rpc(Q) ->
 
 
 dostart(Args) ->
-	inets:start(),
 	Pid=spawn_link(?MODULE, loop, [Args]),
 	register(?SERVER, Pid),
-	io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
+	%io:format("~p: erl pid[~p] os pid[~p]~n", [?MODULE, Pid, os:getpid()]),
 	{ok, Pid}.
 
 
