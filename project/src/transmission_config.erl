@@ -159,7 +159,8 @@ do_load_config() ->
 	%erase(),
 	
 	Filename=get_config_filename(),
-	Result=?CTOOLS:config({?LOGMOD, ?LOGFUN}, Modules, Filename),
+	io:format("modules<~p> config filename: ~p~n", [Modules, Filename]),
+	Result=?CTOOLS:config({?LOGMOD, ?LOGFUN}, Filename, Modules),
 	case Result of
 		{ok, Version, Config} ->
 			put(config, Config),

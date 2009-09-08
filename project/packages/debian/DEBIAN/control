@@ -2,7 +2,7 @@ Package: erlang-transmission
 Version: $version
 Priority: optional
 Architecture: all
-Depends: erlang-mswitch (>= 2.00)
+Depends: erlang-mswitch (>= 2.1)
 Section: Other
 Maintainer: Jean-Lou Dupont <erlang@jldupont.com>
 Description: Erlang BT Transmission client library

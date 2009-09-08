@@ -12,7 +12,7 @@
 %%
 -define(SERVER,     transmission).
 -define(SWITCH,     transmission_hwswitch).
--define(BUSSES,     [sys]).
+-define(BUSSES,     [clock, sys]).
 -define(RPCTIMEOUT, 2000).
 -define(CLIENT,     transmission_client).
 -define(TOOLS,      mswitch_tools).
@@ -161,6 +161,11 @@ handle_api_error(Reason) ->
 	handle_api_error(State, Reason).
 
 %% The BT transmission is probably off-line
+handle_api_error(undefined, Reason) ->
+	put(request.state, error),
+	clog(api.error, error, "Request error, reason: ", [Reason]);
+
+%% The BT transmission is probably off-line
 handle_api_error(success, Reason) ->
 	put(request.state, error),
 	clog(api.error, error, "Request error, reason: ", [Reason]);
@@ -263,8 +268,8 @@ set_timer(TRef) ->
 	case Result of
 		{error, Reason} ->
 			log(critical, "cannot initialize polling timer, reason: ", [Reason]);
-		{ok, TRef} ->
-			put(polling.timer, TRef)
+		{ok, TRef2} ->
+			put(polling.timer, TRef2)
 	end.
 
 		
@@ -322,7 +327,9 @@ blacklist() ->
 defaults() ->
 	[
 	 %% poll interval (in ms)
-	 {transmission.poll.interval,    optional, int,  30*1000}
+	 {transmission.poll.interval,     optional, int,  30*1000}
+	,{transmission.poll.interval.min, optional, int,  1*1000}
+	,{transmission.poll.interval.max, optional, int,  10*60*1000}
 	 
 	 %% Priority level for messages sent on the 'notif' bus through Mswitch
 	 ,{transmission.notif.priority,  optional, int,  2}

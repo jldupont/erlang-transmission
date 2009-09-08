@@ -244,6 +244,7 @@ loop(LogName) ->
 handle({log, Severity, Msg, Params}) ->
 	maybe_dolog(Severity, Msg, Params);
 
+
 handle({hwswitch, _From, sys, reload}) ->
 	ok;
 
@@ -545,7 +546,7 @@ blacklist() ->
 %%
 defaults() ->
 	[
-	 {log.policer.bypass, optional, atom, false}
+	 {log.policer.bypass, optional, atom, true}
 	
 	 ,{log.debug, optional, atom, true}
 	 ].
