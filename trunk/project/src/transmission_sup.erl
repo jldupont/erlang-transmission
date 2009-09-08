@@ -44,6 +44,7 @@ init(_Args) ->
 	Hwswitch=transmission_hwswitch,
 	Clock=transmission_clock,	
 	AppCtl=transmission_appctl,
+	Daemon=transmission_daemon,
 	
 	%% Add all modules here
 	%% List the modules that require HWSWITCH bus access
@@ -69,9 +70,12 @@ init(_Args) ->
 
 	Child_config = {Config,{Config, start_link,[CF_Modules]},
 	      permanent,2000,worker,[Config]},
+
+	Child_daemon = {Daemon,{Daemon, start_link,[]},
+	      permanent,2000,worker,[Daemon]},
 	
 	Children = [Child_logger, Child_switch, Child_clock, Child_appctl,  
-				Child_config    ],
+				Child_config, Child_daemon    ],
 	
 	
     {ok,{{one_for_one,5,1}, Children }}.

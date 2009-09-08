@@ -11,18 +11,24 @@
 %% Defines
 %%
 -define(SERVER, transmission).
+-define(SWITCH, transmission_hwswitch).
+-define(BUSSES, []).
 
 %%
 %% Exported Functions
 %%
 -export([
-		 start/0,
-		 start/1,
+		 start_link/0,
 		 stop/0,
 		 
 		 %% API
-		 api/1,
-		 req/4
+		 get_server/0
+		,get_busses/0
+	    ,defaults/0
+	    ,blacklist/0
+	   
+		,api/1
+		,req/4
 		 ]).
 
 -export([
@@ -36,9 +42,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported Functions - not really part of API per-se
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start()     -> dostart([start]).
-start([])   -> dostart([start]);
-start(Args) -> dostart(Args).
+start_link() ->
+	dostart([]).
 
 stop() -> ?SERVER ! stop.
 
@@ -48,6 +53,9 @@ stop() -> ?SERVER ! stop.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 api(status) ->
 	{pid, os:getpid()};
+
+api(reload) ->
+	ok;
 
 api(Cmd) ->
 	{command_invalid, Cmd}.
@@ -61,6 +69,8 @@ req(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ADMIN API Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_server() ->	?SERVER.
+get_busses() -> ?BUSSES.
 
 
 
@@ -123,4 +133,40 @@ reply({From, Context}, Message) ->
 
 doreq(ReplyDetails, Method, MandatoryParams, OptionalParams) ->
 	reply(ReplyDetails, request_done).
+
+
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%%log(Severity, Msg) ->
+%%	log(Severity, Msg, []).
+
+log(Severity, Msg, Params) ->
+	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
+
+clog(Ctx, Sev, Msg) ->
+	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
+
+%clog(Ctx, Sev, Msg, Ps) ->
+%	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
+
+%% ----------------------          ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------          ------------------------------
+
+%% @doc List of parameters which cannot be customized
+%%
+%% @spec blacklist() -> list()
+%%
+blacklist() ->
+	[].
+
+%% @doc List of default parameters for the module
+%%
+%% @spec defaults() -> list()
+%%
+defaults() ->
+	[].
 
