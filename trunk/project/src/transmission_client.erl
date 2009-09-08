@@ -7,7 +7,7 @@
 %% status=8 -> "seeding"  aka "completed"
 %%
 %% NOTES
-%%  - do not use "localhost": module HTTP barks 
+%%  - do not use "localhost": module HTTP barks (probably because a 'proxy' must be defined?)
 %%
 -module(transmission_client).
 
@@ -160,9 +160,17 @@ reply(undefined, Message) ->
 	io:format("~p:reply(~p)~n", [?MODULE, Message]),
 	Message;
 
+
 %% @private
 reply({From, Context}, Message) ->
-	From ! {Context, Message}.
+	try
+		From ! {Context, Message},
+		ok
+	catch
+		_:_ -> 
+			io:format("reply: error sending reply~n"),
+			{error, reply}
+	end.
 
 
 
@@ -171,8 +179,9 @@ format_encoded_list("")    -> "";
 format_encoded_list(Liste) -> "?"++Liste.
 
 
-%% Conditionally add a tuple to a list
+%% @doc Conditionally add a tuple to a list
 %% Value = list() | atom() | string()
+%%
 cond_add_to_list(Key, Value, List) when length(Value) > 0 ->
 	List++[{Key, Value}];
 

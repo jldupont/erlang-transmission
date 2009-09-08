@@ -44,7 +44,7 @@ init(_Args) ->
 	Hwswitch=transmission_hwswitch,
 	Clock=transmission_clock,	
 	AppCtl=transmission_appctl,
-	App=transmission_daemon,
+	App=transmission,
 	
 	%% Add all modules here
 	%% List the modules that require HWSWITCH bus access
