@@ -20,6 +20,10 @@
 %%  <li>Generate 'clock.tick.sync'</li>
 %% </ul>
 %%
+%% =HWSWITCH=
+%%
+%% ** No message dependencies **
+%%
 -module(transmission_clock).
 
 -define(SERVER, clock).
@@ -136,20 +140,11 @@ do_sync([Delay|Tail]) ->
 	put(sync_pattern, Tail).
 
 
-%% ----------------------            ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------            ------------------------------
-
-
-
-
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
 
-%%log(Severity, Msg) ->
-%%	log(Severity, Msg, []).
 
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).

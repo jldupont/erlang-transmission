@@ -47,6 +47,12 @@
 -define(TOOLS,  mswitch_tools).
 -define(CTOOLS, mswitch_ctools).
 
+-define(CONFIG_FILENAME, ".etrx").
+
+-define(LOGMOD, transmission_log).
+-define(LOGFUN, log).
+
+
 %%
 %% Management Functions
 %%
@@ -152,7 +158,8 @@ do_load_config() ->
 	%% erase all process information
 	%erase(),
 	
-	Result=?CTOOLS:config(Modules),
+	Filename=get_config_filename(),
+	Result=?CTOOLS:config({?LOGMOD, ?LOGFUN}, Modules, Filename),
 	case Result of
 		{ok, Version, Config} ->
 			put(config, Config),
@@ -206,7 +213,12 @@ safe_send(Server, Msg) ->
 			log(error, "error sending configuration to module server:", [Server])
 	end.
 
-			
+
+get_config_filename() ->
+	HOME=os:getenv("HOME"),
+	HOME++"/"++?CONFIG_FILENAME.
+
+	
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  LOGGER  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
