@@ -131,7 +131,7 @@ rpc(Command) ->
 
 
 dorpc(Message) ->
-	Node=tools:make_node(transmission),
+	Node=make_node(transmission),
 	
 	case rpc:call(Node, transmission_daemon, api, [Message], 2000) of
 		{badrpc, _Reason} ->
@@ -140,3 +140,32 @@ dorpc(Message) ->
 		Other ->
 			Other
 	end.
+
+
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+
+	
+extract_host(Node) when is_atom(Node) ->
+	extract_host(atom_to_list(Node));
+
+extract_host(Node) when is_list(Node) ->
+	Tokens = string:tokens(Node, "@"),
+	lists:last(Tokens).
+	
+
+
+make_node(Name) ->
+	make_node(Name, node()).
+
+make_node(Name, Node) when is_atom(Name) ->
+	make_node(erlang:atom_to_list(Name), Node);
+
+make_node(Name , Node) when is_list(Name) ->
+	Host=extract_host(Node),
+	PartialName=string:concat(Name, "@"),
+	CompleteName=string:concat(PartialName, Host),
+	erlang:list_to_atom(CompleteName).
+
+	
