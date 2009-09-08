@@ -16,14 +16,13 @@
 %%
 -define(API, "http://127.0.0.1:9091/transmission/rpc").
 -define(TIMEOUT, 2000).
--define(TOOLS, transmission_tools).
+-define(TOOLS, mswitch_tools).
 
 
 %%
 %% Exported Functions
 %%
 -export([
-		start/0,
 		start_link/0,
 		stop/0,
 		req/5
@@ -43,16 +42,7 @@
 %% API Functions
 %%
 %% @spec start() -> {ok, Pid}
-start() ->
-	inets:start(),
-	Pid = spawn(?MODULE, loop, []),
-	register(?MODULE, Pid),
-	{ok,Pid}.
-
-
-%% @spec start_link() -> {ok, Pid}
 start_link() ->
-	inets:start(),
 	Pid = spawn_link(?MODULE, loop, []),
 	register(?MODULE, Pid),
 	{ok,Pid}.
@@ -154,13 +144,13 @@ request(ReturnDetails, _SessionId, Method, _MandatoryParams, _OptionalParams) ->
 doreq(Rd, SessionId, get, Method, MandatoryParams, OpParams) ->
 	Params=[{"method", Method}]++lists:append(MandatoryParams, OpParams),
 	PL=?TOOLS:encode_list(Params),
-	Req=?TOOLS:format_encoded_list(PL),
-	Headers=?TOOLS:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
+	Req=format_encoded_list(PL),
+	Headers=cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
 	do_request(get, Rd, ?TIMEOUT, Method, Req, Headers).
 
 
 doreq(Rd, SessionId, post, Method, Body) ->
-	Headers=?TOOLS:cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
+	Headers=cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
 	do_request(post, Rd, ?TIMEOUT, Method, Headers, "application/json", Body).
 
 
@@ -224,9 +214,9 @@ hresponse(Rid, Result) ->
 	Method=get({method, Rid}),
 	erase({requestid, Rid}),
 	erase({method, Rid}),
-	Code=?TOOLS:extract(Result, http.code),
-	Headers=?TOOLS:extract(Result, headers),
-	Body=?TOOLS:extract(Result, body),
+	Code=?TOOLS:http_extract(Result, http.code),
+	Headers=?TOOLS:http_extract(Result, headers),
+	Body=?TOOLS:http_extract(Result, body),
 	hr(Rid, Rd, Method, Result, Code, Headers, Body).
 
 
@@ -238,3 +228,20 @@ hr(_Rid, Rd, _Method, _Result, Code, Headers, Body) ->
 	reply(Rd, {response, Code, Headers, Body}).
 
 
+
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+
+
+format_encoded_list("")    -> "";
+format_encoded_list(Liste) -> "?"++Liste.
+
+
+%% Conditionally add a tuple to a list
+%% Value = list() | atom() | string()
+cond_add_to_list(Key, Value, List) when length(Value) > 0 ->
+	List++[{Key, Value}];
+
+cond_add_to_list(_Key, _Value, List) ->
+	List.
