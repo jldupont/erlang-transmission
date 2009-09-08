@@ -17,6 +17,7 @@
 -define(API, "http://127.0.0.1:9091/transmission/rpc").
 -define(TIMEOUT, 2000).
 -define(TOOLS, mswitch_tools).
+-define(JSON, transmission_json).
 
 
 %%
@@ -24,6 +25,8 @@
 %%
 -export([
 		request/5 
+		,decode/1
+		,extract/2
 		]).
 
  
@@ -147,7 +150,69 @@ do_request(Type, ReturnDetails, Timeout, Method, Headers, ContentType, Body) ->
 
 
 
+%% ----------------------           ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------           ------------------------------
+decode(S) ->
+	try
+		L=erlang:binary_to_list(S),
+		?JSON:decode_string(L)
+	catch
+		_:_ ->
+			error
+	end.
 
+extract(JS, top) ->
+	io:format("extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, Top}=JS,
+		Top
+	catch
+		_:_ -> error
+	end;
+
+
+extract(JS, arguments) ->
+	io:format("arguments: extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, Top}=JS,
+		[{arguments, Arguments}] = Top,
+		Arguments
+	catch
+		_:_ -> error
+	end;
+
+
+extract(JS, torrents) ->
+	io:format("extracting from: ~p~n~n~n", [JS]),
+	try
+		{struct, [{arguments, {struct, Torrents},_,_,_}]
+		}=JS,
+		Torrents
+	catch
+		_:_ -> error
+	end.
+
+
+
+
+example() -> "
+decoded: body<{ok,
+               {struct,
+                [{arguments,
+                  {struct,
+                   [{torrents,
+                     {array,
+                      [{struct,
+                        [{downloadDir,\"/home/jldupont\"},
+                         {files,
+                          {array,
+                           [{struct,
+                             [{bytesCompleted,2953628},
+                              {length,11784604},
+                              {name,
+                               \"Within Temptation - Destroyed[2008] [MP3]-RoCK&BlueLadyRG/01 Destroyed.mp3\"}]},
+".
 
 
 %% ----------------------           ------------------------------
