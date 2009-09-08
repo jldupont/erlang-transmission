@@ -78,8 +78,7 @@ start_link(_) ->
 
 stop() ->
 	try 
-		?SERVER ! stop,
-		ok
+		?SERVER ! stop,  ok
 	catch
 		_:_ ->	{error, cannot_stop}
 	end.
@@ -98,8 +97,7 @@ loop() ->
 			put(modules, Modules);
 		
 		{config, Version, Config} ->
-			put(config.version, Version),
-			?CTOOLS:put_config(Config);
+			?CTOOLS:put_config(Version, Config);
 		
 		stop ->
 			exit(normal);
