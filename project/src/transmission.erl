@@ -199,7 +199,15 @@ hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
 
 
 hr(_Rid, _Rd, _Method, _Result, Code, _Headers, Body) ->
-	io:format("response: code<~p> body<~p>~n", [Code, Body]).
+	{ok, D}=?CLIENT:decode(Body),
+	%io:format("decoded: body<~p>~n~n~n", [D]),
+	%io:format("response: code<~p> body<~p>~n~n~n", [Code, Body]).
+	%T=?CLIENT:extract(D, torrents),
+	A=?CLIENT:extract(D, arguments),
+	%Top=?CLIENT:extract(D, top),
+	%io:format("Top: ~p~n~n", [Top]).
+	io:format("Arguments: ~p~n~n", [A]).
+	%io:format("torrents: ~p~n~n", [T]).
 
 maybe_grab_sid({_, Sid}) ->
 	clog(api.session.id, info, "session id: ", [Sid]),
