@@ -4,6 +4,11 @@
 %%
 %% @author Jean-Lou Dupont
 %%
+%% Customize here
+name() -> "transmission".
+%% ^^^^^^^^^^^^^^^^^
+
+cmds() -> "[status|stop]".
 
 code_ok()               -> 0.
 code_error()            -> 1.
@@ -13,16 +18,17 @@ code_lib_not_found()    -> 4.
 code_node_not_found()   -> 5.
 
 
-err_lib()    -> "erlang-transmission not found".
-err_daemon() -> "daemon not found".
-err_node()   -> "transmission node not found".
+err_lib()      -> name()++" library not found".
+err_daemon()   -> "daemon not found".
+err_node()     -> name()++" node not found".
+err_response() -> "invalid response.".
+
 
 msg_pid()    -> "daemon found, pid: ".
-msg_usage()  -> "usage: etrx_control [-q] [status|stop]".
+msg_usage()  -> "usage: "++name()++"_control [-q] "++cmds().
 msg_kill()   -> "stop command sent".
 
-
-main(["-q", "stop"]) -> 	run(quiet,   stop);
+main(["-q", "stop"])   -> 	run(quiet,   stop);
 main(["-q", "status"]) ->	run(quiet, 	 status);
 main(["stop"]) ->			run(verbose, stop);
 main(["status"]) ->			run(verbose, status);
@@ -37,45 +43,42 @@ main([_Cmd]) ->
 
 
 run(Feedback, stop) ->
-
-	add_cwd(),
+	Response = makerpc(pid, status),
+	Pid = handle(Feedback, Response, pid),
+	os:cmd("kill -9 "++Pid),
+	msg(Feedback, code_ok(), msg_kill());
 	
-	case getstatus() of
-		daemon_not_found ->
-			msg(Feedback, code_daemon_not_found(), err_daemon());
-					
-		{pid, Pid} ->
-			os:cmd("kill -9 "++Pid),
-			msg(Feedback, code_ok(), msg_kill());
-			
-		{error, lib_not_found} ->
-			msg(Feedback, code_lib_not_found(), err_lib());
-			
-		{error, node_not_found} ->
-			msg(Feedback, code_node_not_found(), err_node())		
-	end;		
 	
-
 run(Feedback, status) ->
+	Response = makerpc(pid, status),
+	Pid = handle(Feedback, Response, pid),
+	msg(Feedback, code_daemon_found(), msg_pid(), Pid).
 
+	
+
+handle(Feedback, Code, Context) ->
 	%%for development
 	add_cwd(),
 	
-	case getstatus() of
+	case Code of
 		daemon_not_found ->
-			msg(Feedback, code_daemon_found(), err_daemon());
+			msg(Feedback, code_daemon_not_found(), err_daemon());
 					
-		{pid, Pid} ->
-			msg(Feedback, code_daemon_found(), msg_pid(), Pid);
-			
 		{error, lib_not_found} ->
 			msg(Feedback, code_lib_not_found(), err_lib());
 			
 		{error, node_not_found} ->
-			msg(Feedback, code_node_not_found(), err_node())		
+			msg(Feedback, code_node_not_found(), err_node());
 	
+		{Context, Message} ->
+			Message;
+			
+		Other ->
+			io:format("Other: ~p~n", [Other]),
+			msg(Feedback, code_error(), err_response())
 	end.
-	
+
+
 
 add_cwd() ->
 	{ok,Cwd}=file:get_cwd(),
@@ -83,15 +86,45 @@ add_cwd() ->
 	code:add_pathsa([Cp]).
 
 
-getstatus() ->
+msg(Feedback, Code, Msg) ->
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~n", [Msg]);
+		_ ->
+			ok
+	end,	
+	halt(Code).
+
+msg(Feedback, Code, Msg1, Msg2) when is_list(Msg2)->
+	case Feedback of 
+		verbose ->
+			io:format(name()++"_control: ~s~p~n", [Msg1, Msg2]);
+		_ ->
+			ok
+	end,	
+	halt(Code);
+	
+	
+	
+msg(Feedback, Code, Msg1, Msg2) ->
+	msg(Feedback, Code, Msg1++Msg2).
+
+
+
+
+%%%%%%%%%%%%%%	
+%% RPC related
+%%%%%%%%%%%%%%
+
+makerpc(Context, Command) ->
 	try
-		Status=rpc(status),
-		case Status of
+		Reply=rpc(Command),
+		case Reply of
 			rpcerror ->
 				daemon_not_found;
 				
-			{pid, Pid} ->
-				{pid, Pid}	
+			{Context, Message} ->
+				{Context, Message}	
 		end
 	catch
 		error:undef ->
@@ -101,23 +134,6 @@ getstatus() ->
 			{error, node_not_found}
 	end.
 
-
-msg(Feedback, Code, Msg) ->
-	case Feedback of 
-		verbose ->
-			io:format("etrx_control: ~s~n", [Msg]);
-		_ ->
-			ok
-	end,	
-	halt(Code).
-	
-msg(Feedback, Code, Msg1, Msg2) ->
-	msg(Feedback, Code, Msg1++Msg2).
-
-
-%%%%%%%%%%%%%%	
-%% RPC related
-%%%%%%%%%%%%%%
 	
 rpc(Command) ->
 	case dorpc(Command) of
@@ -131,9 +147,10 @@ rpc(Command) ->
 
 
 dorpc(Message) ->
-	Node=make_node(transmission),
+	Atom=erlang:list_to_atom(name()),
+	Node=make_node(Atom),
 	
-	case rpc:call(Node, transmission, daemon_api, [Message], 2000) of
+	case rpc:call(Node, Atom, daemon_api, [Message], 2000) of
 		{badrpc, _Reason} ->
 			rpcerror;
 		
@@ -141,13 +158,7 @@ dorpc(Message) ->
 			Other
 	end.
 
-
-%% ----------------------           ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------           ------------------------------
-
-	
-extract_host(Node) when is_atom(Node) ->
+extract_host(Node) when is_atom(Node) -> 
 	extract_host(atom_to_list(Node));
 
 extract_host(Node) when is_list(Node) ->
@@ -167,5 +178,4 @@ make_node(Name , Node) when is_list(Name) ->
 	PartialName=string:concat(Name, "@"),
 	CompleteName=string:concat(PartialName, Host),
 	erlang:list_to_atom(CompleteName).
-
 	
