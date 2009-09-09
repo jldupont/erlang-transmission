@@ -10,6 +10,7 @@
 %%  - do not use "localhost": module HTTP barks (probably because a 'proxy' must be defined?)
 %%
 -module(transmission_client).
+-compile(export_all).
 
 %%
 %% Defines
