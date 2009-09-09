@@ -7,7 +7,7 @@
 %%
 %% MACROS
 %%
--define(SUPPORTED_CMDS, [reload, status, getcmds]).
+-define(SUPPORTED_CMDS, [getapiversion, reload, status, getcmds]).
 -define(API_VERSION, {1,0}).
 -define(SERVER,     transmission).
 -define(TIMEOUT,    1000).
@@ -35,8 +35,8 @@ handle_rpc(ReplyTo, _FromNode, RC, getcmds) ->
 %% Reloads the configuration from file
 %%
 handle_rpc(ReplyTo, _FromNode, RC, reload) ->
-	Result=?SWITCH:publish(sys, reload),
-	rpc_reply(ReplyTo, {RC, Result});
+	?SWITCH:publish(sys, reload),
+	rpc_reply(ReplyTo, {RC, ok});
 
 
 %% Retrieves the API version

@@ -55,12 +55,10 @@ stop() -> ?SERVER ! stop.
 
 
 
-%% ----------------------            ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON RPC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------            ------------------------------
+%% ----------------------                   ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON MANAGEMENT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------                   ------------------------------
 
-%% Messages are sent to the server loop in this module
-%%
 daemon_api(ReplyContext, Command) ->
 	case ?RPC:rpc_validate_command(Command) of
 		true ->
@@ -69,12 +67,6 @@ daemon_api(ReplyContext, Command) ->
 			%?MNG:inc_stat(error_daemon_api_invalid_command),
 			{error, invalid_command}
 	end.
-
-
-%% ----------------------            ------------------------------
-%%%%%%%%%%%%%%%%%%%%%%%%% DAEMON API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ----------------------            ------------------------------
-
 
 
 
@@ -103,7 +95,7 @@ loop() ->
 		%%
 		{rpc, ReplyTo, {FromNode, ReplyContext, Q}} ->
 			?RPC:handle_rpc(ReplyTo, FromNode, ReplyContext, Q);
-	
+
 		
 		%%%% CONFIGURATION MANAGEMENT
 		
@@ -206,7 +198,7 @@ hr(_Rid, _Rd, "torrent-get", _Result, _Code, _Headers, Body) ->
 		Torrents=?CLIENT:extract(A, torrents),
 		process_torrents(Torrents)
 	catch
-		X:Y ->
+		_X:_Y ->
 			%io:format("X<~p> Y<~p>~n", [X,Y]),
 			error
 	end;
