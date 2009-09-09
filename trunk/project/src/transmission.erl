@@ -234,17 +234,36 @@ process_torrents(Torrents) when is_list(Torrents), length(Torrents)>0 ->
 	Name=?CLIENT:extract(torrent, Torrent, name),
 	Id=?CLIENT:extract(torrent, Torrent, id),
 	Status=?CLIENT:extract(torrent, Torrent, status),
-	io:format("torrent: name<~p> id<~p> status<~p> ~n~n", [Name, Id, Status]),
+	%io:format("torrent: name<~p> id<~p> status<~p> ~n~n", [Name, Id, Status]),
+	maybe_notif_torrent(Name, Id, Status),
 	process_torrents(Rest);
 
-
-process_torrents([]) ->
-	ok;
-
-process_torrents(_) ->
-	nothing_todo.
+process_torrents([]) ->	finished;
+process_torrents(_)  -> nothing_todo.
 
 
+maybe_notif_torrent(error, _, _) ->
+	invalid_torrent;
+
+maybe_notif_torrent(Name, Id, Status) ->
+	Torrent=get({torrent, Name}),
+	maybe_notif_torrent2(Name, Id, Status, Torrent).
+	
+% first time around 
+maybe_notif_torrent2(Name, Id, Status, undefined) ->
+	put({torrent, Name}, {Id, Status}),
+	?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status}});
+
+maybe_notif_torrent2(Name, Id, Status, {_, PreviousStatus}) ->
+	case Status == PreviousStatus of
+		 true  -> status_unchanged;
+		 false ->
+			 put({torrent, Name}, {Id, Status}),
+			 ?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status}})
+	end;
+
+maybe_notif_torrent2(_, _, _, Other) ->
+	log(critical, "notif exception: ", [Other]).
 
 
 
