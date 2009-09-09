@@ -9,6 +9,10 @@
 -define(BUSSES,  [sys, clock, notif]).
 -define(CTOOLS,  mswitch_ctools).
 -define(MSWITCH, mswitch).
+-define(CLIENT,  transmission_client).
+
+-define(STATE_COMPLETED, 8).
+
 
 %%
 %% API Functions
@@ -75,8 +79,30 @@ loop() ->
 		{hwswitch, From, Bus, Msg} ->
 			handle({hwswitch, From, Bus, Msg});
 	
+		%%% TRANSMISSION API related
+		%%% ------------------------
+		{http, {RequestId, {error, Reason}}} ->
+			%ReturnDetails=get({requestid, RequestId}),
+			%%Method=get({method, RequestId}),
+			erase({requestid, RequestId}),
+			erase({method, RequestId}),
+			%%io:format("got: Method[~p]~n",[Method]),
+			handle_api_error(Reason);
+			
+
+		
+		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
+		%% HttpVersion = string()         (eg. "HTTP/1.1")
+		%% HttpCode = integer()           (eg. "200")
+		%% HttpResponseCode = string()    (eg. "OK")
+		%% Headers = {key, value}, {key, value} ...
+		%% ResponseBody = string()
+		{http, {RequestId, Result}} ->
+			handle_api_response(RequestId, Result);
+		
+		
 		Other ->
-			log(warning, "notifier: unexpected message: ", [Other])
+			log(warning, "stopper: unexpected message: ", [Other])
 	end,
 	loop().
 
@@ -121,7 +147,17 @@ handle({hwswitch, _From, notif, _}) ->
 	not_supported;
 
 handle(Other) ->
-	log(warning, "notifier: Unexpected message: ", [Other]).
+	log(warning, "stopper: Unexpected message: ", [Other]).
+
+
+
+handle_api_error(Reason) ->
+	log(error, "cannot stop torrent, reason:", [Reason]).
+
+
+handle_api_response(RequestId, Result) ->
+	ok.
+
 
 
 %% ----------------------          ------------------------------
@@ -139,8 +175,9 @@ maybe_stop_torrent(working, Msg) ->
 maybe_stop_torrent(_, _Msg) ->
 	suspended.
 
-maybe_stop(true, {torrent, _Priority, {Name, Id, Status, DL}}) ->
-	ok;
+maybe_stop(true, {torrent, _Priority, {Name, Id, ?STATE_COMPLETED, DL}}) ->
+	?CLIENT:request(undefined, SessionId, torrent.remove, Id, []);
+
 
 maybe_stop(_, _Msg) ->
 	no_autostop.
