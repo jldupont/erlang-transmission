@@ -6,7 +6,8 @@
 
 -define(SERVER,  stopper).
 -define(SWITCH,  transmission_hwswitch).
--define(BUSSES,  [sys, clock, notif]).
+-define(BUSSES,  [sys, clock, notif, data]).
+-define(TOOLS,   mswitch_tools).
 -define(CTOOLS,  mswitch_ctools).
 -define(MSWITCH, mswitch).
 -define(CLIENT,  transmission_client).
@@ -82,21 +83,10 @@ loop() ->
 		%%% TRANSMISSION API related
 		%%% ------------------------
 		{http, {RequestId, {error, Reason}}} ->
-			%ReturnDetails=get({requestid, RequestId}),
-			%%Method=get({method, RequestId}),
 			erase({requestid, RequestId}),
 			erase({method, RequestId}),
-			%%io:format("got: Method[~p]~n",[Method]),
 			handle_api_error(Reason);
-			
 
-		
-		%% Result = {{HttpVersion, HttpCode, HttpResponseCode}, [Headers], ResponseBody}
-		%% HttpVersion = string()         (eg. "HTTP/1.1")
-		%% HttpCode = integer()           (eg. "200")
-		%% HttpResponseCode = string()    (eg. "OK")
-		%% Headers = {key, value}, {key, value} ...
-		%% ResponseBody = string()
 		{http, {RequestId, Result}} ->
 			handle_api_response(RequestId, Result);
 		
@@ -136,7 +126,7 @@ handle({hwswitch, _From, sys, {mod.config, Module, Version}}) ->
 
 
 handle({hwswitch, _From, sys, _Msg}) ->
-	%io:format("app: rx sys msg[~p]~n", [Msg]);
+	%io:format("stopper: rx sys msg[~p]~n", [Msg]);
 	not_supported;
 
 
@@ -146,18 +136,89 @@ handle({hwswitch, _From, notif, {torrent, _, Msg} }) ->
 handle({hwswitch, _From, notif, _}) ->
 	not_supported;
 
+handle({hwswitch, _From, data, Data}) ->
+	grab_data(Data);
+
+
 handle(Other) ->
 	log(warning, "stopper: Unexpected message: ", [Other]).
 
 
 
+%% ----------------------            ------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%    API     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ----------------------            ------------------------------
+
 handle_api_error(Reason) ->
-	log(error, "cannot stop torrent, reason:", [Reason]).
+	State=get(request.state),
+	handle_api_error(State, Reason).
 
+%% The BT transmission is probably off-line
+handle_api_error(undefined, Reason) ->
+	put(request.state, error),
+	clog(api.error, error, "Request error, reason: ", [Reason]);
 
-handle_api_response(RequestId, Result) ->
+%% The BT transmission is probably off-line
+handle_api_error(success, Reason) ->
+	put(request.state, error),
+	clog(api.error, error, "Request error, reason: ", [Reason]);
+
+%% Squelch repeating errors
+handle_api_error(error, _Reason) ->
 	ok.
 
+
+
+handle_api_response(Rid, Result) ->
+	%% for squelching functionality
+	put(request.state, success),
+	
+	Rd=get({requestid, Rid}),
+	%%io:format("hresponse: rd: ~p~n", [Rd]),	
+	Method=get({method, Rid}),
+	erase({requestid, Rid}),
+	erase({method, Rid}),
+	Code=?TOOLS:http_extract(Result, http.code),
+	Headers=?TOOLS:http_extract(Result, headers),
+	Body=?TOOLS:http_extract(Result, body),
+	hr(Rid, Rd, Method, Result, Code, Headers, Body).
+
+
+%% Grab the session Id for future requests
+hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
+	Result=?TOOLS:kfind("x-transmission-session-id", Headers, not_found),
+	maybe_grab_sid(Result);
+
+
+hr(_Rid, Rd, "torrent-remove", _Result, _Code, _Headers, Body) ->
+	try
+		{ok, D}=?CLIENT:decode(Body),
+		{Name, Id, _DL} = Rd,
+		io:format("removed <~p> id<~p> ~n~n", [Name, Id]),
+		log(info, "remove response: ", [D])
+		
+	catch
+		X:Y ->
+			io:format("X<~p> Y<~p>~n", [X,Y]),
+			error
+	end;
+
+
+hr(_Rid, _Rd, Method, _Result, _Code, _Headers, _Body) ->
+	log(error, "unhandled method: ", [Method]).
+
+
+maybe_grab_sid({_, Sid}) ->
+	clog(api.session.id, info, "session id: ", [Sid]),
+	put(session.id, Sid);
+
+maybe_grab_sid(_) ->
+	ok.
+
+
+grab_data({session.id, Sid}) ->	put(session.id, Sid);
+grab_data(_) ->	not_supported.
 
 
 %% ----------------------          ------------------------------
@@ -175,8 +236,10 @@ maybe_stop_torrent(working, Msg) ->
 maybe_stop_torrent(_, _Msg) ->
 	suspended.
 
-maybe_stop(true, {torrent, _Priority, {Name, Id, ?STATE_COMPLETED, DL}}) ->
-	?CLIENT:request(undefined, SessionId, torrent.remove, Id, []);
+maybe_stop(true, {Name, Id, ?STATE_COMPLETED, DL}) ->
+	io:format("maybe_stop: ~p~n~n", [Name]),	
+	SessionId=get(session.id),
+	?CLIENT:request({Name, Id, DL}, SessionId, torrent.remove, Id, []);
 
 
 maybe_stop(_, _Msg) ->
@@ -211,8 +274,8 @@ log(Severity, Msg, Params) ->
 %clog(Ctx, Sev, Msg) ->
 %	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
 
-%clog(Ctx, Sev, Msg, Ps) ->
-%	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
+clog(Ctx, Sev, Msg, Ps) ->
+	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
 
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  CONFIG  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

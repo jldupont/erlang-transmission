@@ -272,7 +272,7 @@ maybe_notif_torrent2(_, _, _, _, Other) ->
 
 maybe_grab_sid({_, Sid}) ->
 	clog(api.session.id, info, "session id: ", [Sid]),
-	%io:format("got session.id<~p>~n", [Sid]),
+	?SWITCH:publish(data, {session.id, Sid}),
 	put(session.id, Sid);
 
 maybe_grab_sid(_) ->
