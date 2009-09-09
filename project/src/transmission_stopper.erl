@@ -237,7 +237,7 @@ maybe_stop_torrent(_, _Msg) ->
 
 maybe_stop(true, {Name, Id, ?STATE_COMPLETED, DL}) ->
 	StrId=to_list(Id),
-	log(info, "attempting to stop: name<~p> id<~p> ~n~n", [[Name, StrId]]),	
+	log(info, "attempting to stop: {Name,Id}", [[Name, StrId]]),	
 	SessionId=get(session.id),
 	?CLIENT:request({Name, Id, DL}, SessionId, torrent.remove, StrId, []);
 

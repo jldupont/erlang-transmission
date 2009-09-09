@@ -361,3 +361,9 @@ extract(torrent, Torrent, Var) ->
 		_:_ -> error
 	end.
 
+
+
+status(8) -> completed;
+status(4) -> downloading;
+status(_) -> unknown.
+
