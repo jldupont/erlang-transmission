@@ -46,15 +46,16 @@ init(_Args) ->
 	AppCtl=transmission_appctl,
 	App=transmission,
 	Notifier=transmission_notifier,
+	Stopper=transmission_stopper,
 	
 	%% Add all modules here
 	%% List the modules that require HWSWITCH bus access
-	HS_Modules = [Logger, Clock, Config, AppCtl, App, Notifier
+	HS_Modules = [Logger, Clock, Config, AppCtl, App, Notifier, Stopper
 				  ],
 	
 	%% List the modules that require configuration
 	%%
-	CF_Modules = [Logger, AppCtl, App, Notifier ],
+	CF_Modules = [Logger, AppCtl, App, Notifier, Stopper ],
 	
 
     Child_logger = {Logger,{Logger, start_link,[{logfilename, "/var/log/transmission.log"}]},
@@ -77,9 +78,12 @@ init(_Args) ->
 
 	Child_notif = {Notifier,{Notifier, start_link,[]},
 	      permanent,2000,worker,[Notifier]},
+
+	Child_stopper = {Stopper,{Stopper, start_link,[]},
+	      permanent,2000,worker,[Stopper]},
 	
 	Children = [Child_logger, Child_switch, Child_clock, Child_appctl,  
-				Child_config, Child_app, Child_notif ],
+				Child_config, Child_app, Child_notif, Child_stopper ],
 	
 	
     {ok,{{one_for_one,5,1}, Children }}.
