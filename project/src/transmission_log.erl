@@ -548,6 +548,6 @@ defaults() ->
 	[
 	 {log.policer.bypass, optional, atom, true}
 	
-	 ,{log.debug, optional, atom, true}
+	 ,{log.debug, optional, atom, false}
 	 ].
 

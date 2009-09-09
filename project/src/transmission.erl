@@ -234,35 +234,38 @@ process_torrents(Torrents) when is_list(Torrents), length(Torrents)>0 ->
 	Name=?CLIENT:extract(torrent, Torrent, name),
 	Id=?CLIENT:extract(torrent, Torrent, id),
 	Status=?CLIENT:extract(torrent, Torrent, status),
+	DL=?CLIENT:extract(torrent, Torrent, downloadDir),
 	%io:format("torrent: name<~p> id<~p> status<~p> ~n~n", [Name, Id, Status]),
-	maybe_notif_torrent(Name, Id, Status),
+	maybe_notif_torrent(Name, Id, Status, DL),
 	process_torrents(Rest);
 
 process_torrents([]) ->	finished;
 process_torrents(_)  -> nothing_todo.
 
 
-maybe_notif_torrent(error, _, _) ->
+maybe_notif_torrent(error, _, _, _) ->
 	invalid_torrent;
 
-maybe_notif_torrent(Name, Id, Status) ->
+maybe_notif_torrent(Name, Id, Status, DL) ->
 	Torrent=get({torrent, Name}),
-	maybe_notif_torrent2(Name, Id, Status, Torrent).
+	maybe_notif_torrent2(Name, Id, Status, DL, Torrent).
 	
 % first time around 
-maybe_notif_torrent2(Name, Id, Status, undefined) ->
-	put({torrent, Name}, {Id, Status}),
-	?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status}});
+maybe_notif_torrent2(Name, Id, Status, DL, undefined) ->
+	put({torrent, Name}, {Id, Status, DL}),
+	log(info, "new torrent {Name, Id, DownloadDir}: ", [[Name, Id, DL]]),
+	?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status, DL}});
 
-maybe_notif_torrent2(Name, Id, Status, {_, PreviousStatus}) ->
+maybe_notif_torrent2(Name, Id, Status, DL, {_, PreviousStatus, _DL}) ->
 	case Status == PreviousStatus of
 		 true  -> status_unchanged;
 		 false ->
-			 put({torrent, Name}, {Id, Status}),
-			 ?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status}})
+			 put({torrent, Name}, {Id, Status, DL}),
+			 log(info, "torrent status change {Name, Id, Status}: ", [[Name, Id, Status]]),
+			 ?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status, DL}})
 	end;
 
-maybe_notif_torrent2(_, _, _, Other) ->
+maybe_notif_torrent2(_, _, _, _, Other) ->
 	log(critical, "notif exception: ", [Other]).
 
 
@@ -281,7 +284,14 @@ maybe_grab_sid(_) ->
 %%
 do_polling() ->
 	SessionId=get(session.id),
-	?CLIENT:request(undefined, SessionId, torrent.get, [], []).
+	State=get_state(),
+	maybe_do_polling(State, SessionId).
+
+maybe_do_polling(working, SessionId) ->
+	?CLIENT:request(undefined, SessionId, torrent.get, [], []);
+
+maybe_do_polling(_, _SessionId) ->
+	suspended.
 
 
 %% ----------------------            ------------------------------
@@ -355,13 +365,13 @@ set_timer(TRef) ->
 set_state(State) ->
 	put(state, State).
 
-%get_state() ->
-%	State=get(state),
-%	case State of
-%		undefined -> working;   %start in 'working' state
-%		working   -> working;
-%		_         -> suspended
-%	end.
+get_state() ->
+	State=get(state),
+	case State of
+		undefined -> working;   %start in 'working' state
+		working   -> working;
+		_         -> suspended
+	end.
 
 
 
@@ -378,8 +388,8 @@ set_state(State) ->
 log(Severity, Msg, Params) ->
 	?SWITCH:publish(log, {?SERVER, {Severity, Msg, Params}}).
 
-clog(Ctx, Sev, Msg) ->
-	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
+%clog(Ctx, Sev, Msg) ->
+%	?SWITCH:publish(log, {Ctx, {Sev, Msg, []}}).
 
 clog(Ctx, Sev, Msg, Ps) ->
 	?SWITCH:publish(log, {Ctx, {Sev, Msg, Ps}}).
@@ -406,9 +416,6 @@ defaults() ->
 	,{transmission.poll.interval.min, optional, int,  1*1000}
 	,{transmission.poll.interval.max, optional, int,  10*60*1000}
 	 
-	 %% Priority level for messages sent on the 'notif' bus through Mswitch
-	 ,{transmission.notif.priority,  optional, int,  2}
-	
 	%% Write a '.completed' file when a download is finished
 	,{transmission.write.completed, optional, atom, true}
 	 ].
