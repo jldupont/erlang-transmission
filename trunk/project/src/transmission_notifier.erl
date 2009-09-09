@@ -9,6 +9,8 @@
 -define(BUSSES,  [sys, clock, notif]).
 -define(CTOOLS,  mswitch_ctools).
 -define(MSWITCH, mswitch).
+-define(CLIENT,  transmission_client).
+
 
 %%
 %% API Functions
@@ -134,7 +136,9 @@ maybe_send_torrent_notif(Msg) ->
 
 maybe_send_torrent_notif(working, Msg) ->
 	P=get(notifier.priority),
-	?MSWITCH:publish(notif, {torrent, P, Msg});
+	{Name, Id, Status, DL} = Msg,
+	SM=?CLIENT:status(Status),
+	?MSWITCH:publish(notif, {torrent, P, {Name, Id, SM, DL}});
 	
 
 maybe_send_torrent_notif(_, _Msg) ->

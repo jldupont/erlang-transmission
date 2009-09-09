@@ -1,9 +1,14 @@
 """
     helper functions
 
-    @version: 0.1
+    @version: 0.2
     @author:  Jean-Lou Dupont
+    
+    ==0.2==
+    * Added 'replace_params_in_globs'
+    
 """
+import glob
 import os
 import shutil
 import sys
@@ -15,6 +20,18 @@ def read_version():
     version = file.read()
     file.close()
     return version
+
+def replace_params_in_globs(globs, params):
+    """
+    Replace the parameters in the matching files
+    specified by patterns in 'globs'
+    """
+    for glb in globs:
+        files=glob.glob(glb)
+        for file in files:
+            replace_params(file, file, params)
+
+    
 
 def replace_params(path_src, path_dest, params):
     """
