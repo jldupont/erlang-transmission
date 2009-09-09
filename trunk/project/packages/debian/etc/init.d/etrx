@@ -107,7 +107,7 @@ class Commands(object):
 	
 		#add development path
 		cwd=os.getcwd()
-		params={"name":self.ctl, "cmd":cwd+"/ebin"}
+		params={"name":self.name, "cmd":cwd+"/ebin"}
 		cmd=self.cmdStart % params
 		proc = subprocess.Popen(cmd, shell=True)
 		return proc.wait()
