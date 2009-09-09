@@ -192,15 +192,14 @@ hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
 
 
 hr(_Rid, Rd, "torrent-remove", _Result, _Code, _Headers, Body) ->
+	{Name, Id, DL} = Rd,	
 	try
 		{ok, D}=?CLIENT:decode(Body),
-		{Name, Id, _DL} = Rd,
-		io:format("removed <~p> id<~p> ~n~n", [Name, Id]),
-		log(info, "remove response: ", [D])
-		
+		{_A, R}=?CLIENT:extract(D, arguments),
+		log(info, "remove report: {Name, Result} ", [[Name, R]])
 	catch
-		X:Y ->
-			io:format("X<~p> Y<~p>~n", [X,Y]),
+		_X:_Y ->
+			log(error, "remove exception: {Name, Id, DownloadDir}", [[Name, Id, DL]]),
 			error
 	end;
 
@@ -237,9 +236,10 @@ maybe_stop_torrent(_, _Msg) ->
 	suspended.
 
 maybe_stop(true, {Name, Id, ?STATE_COMPLETED, DL}) ->
-	io:format("maybe_stop: ~p~n~n", [Name]),	
+	StrId=to_list(Id),
+	log(info, "attempting to stop: name<~p> id<~p> ~n~n", [[Name, StrId]]),	
 	SessionId=get(session.id),
-	?CLIENT:request({Name, Id, DL}, SessionId, torrent.remove, Id, []);
+	?CLIENT:request({Name, Id, DL}, SessionId, torrent.remove, StrId, []);
 
 
 maybe_stop(_, _Msg) ->
@@ -249,6 +249,22 @@ maybe_stop(_, _Msg) ->
 %% ----------------------          ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------          ------------------------------
+to_list(I) when is_integer(I) ->
+	erlang:integer_to_list(I);
+
+to_list(A) when is_atom(A) ->
+	erlang:atom_to_list(A);
+
+to_list(F) when is_float(F) ->
+	erlang:float_to_list(F);
+
+to_list(L) when is_list(L) ->
+	L;
+
+to_list(E) -> E.
+
+
+
 set_state(State) ->
 	put(state, State).
 

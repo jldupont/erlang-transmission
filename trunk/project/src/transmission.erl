@@ -200,33 +200,20 @@ hr(_Rid, _Rd, _Method, _Result, 409, Headers, _) ->
 hr(_Rid, _Rd, "torrent-get", _Result, _Code, _Headers, Body) ->
 	try
 		{ok, D}=?CLIENT:decode(Body),
-		A=?CLIENT:extract(D, arguments),
+		Result=?CLIENT:extract(D, arguments),
+		%io:format("hr: result: ~p~n~n", [Result]),
+		{A, _R}=Result,
 		Torrents=?CLIENT:extract(A, torrents),
 		process_torrents(Torrents)
 	catch
 		X:Y ->
-			io:format("X<~p> Y<~p>~n", [X,Y]),
+			%io:format("X<~p> Y<~p>~n", [X,Y]),
 			error
 	end;
 
 
 hr(_Rid, _Rd, Method, _Result, _Code, _Headers, _Body) ->
 	log(error, "unhandled method: ", [Method]).
-	%{ok, D}=?CLIENT:decode(Body),
-	%io:format("decoded: body<~p>~n~n~n", [D]).
-	%io:format("response: code<~p> body<~p>~n~n~n", [Code, Body]).
-	
-	%A=?CLIENT:extract(D, arguments),
-	%T=?CLIENT:extract(A, torrents),
-	%F=?CLIENT:extract(T, files),
-	%Top=?CLIENT:extract(D, top),
-	%io:format("Top: ~p~n~n", [Top]).
-	%io:format("Arguments: ~p~n~n", [A])
-	%io:format("torrents: ~p~n~n", [T]).
-	%io:format("files: ~p~n~n", [F]).
-	%[H|_R]=T,
-	%Name=?CLIENT:extract(torrent, H, name),
-	%io:format("torrent name: ~p~n", [Name]).
 
 
 process_torrents(Torrents) when is_list(Torrents), length(Torrents)>0 ->
@@ -252,21 +239,43 @@ maybe_notif_torrent(Name, Id, Status, DL) ->
 	
 % first time around 
 maybe_notif_torrent2(Name, Id, Status, DL, undefined) ->
-	put({torrent, Name}, {Id, Status, DL}),
+	MinCount=get_clock_min(),
+	put({torrent, Name}, {Id, Status, DL, MinCount}),
 	log(info, "new torrent {Name, Id, DownloadDir}: ", [[Name, Id, DL]]),
 	?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status, DL}});
 
-maybe_notif_torrent2(Name, Id, Status, DL, {_, PreviousStatus, _DL}) ->
+maybe_notif_torrent2(Name, Id, Status, DL, {_, PreviousStatus, _DL, Count}) ->
+	CurrentCount=get(clock.min),
+
 	case Status == PreviousStatus of
-		 true  -> status_unchanged;
+		 true  ->
+			maybe_repeat_notif(CurrentCount, Count, Name, Id, Status, DL);			 
 		 false ->
-			 put({torrent, Name}, {Id, Status, DL}),
-			 log(info, "torrent status change {Name, Id, Status}: ", [[Name, Id, Status]]),
-			 ?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status, DL}})
+			 put({torrent, Name}, {Id, Status, DL, Count}),
+			 do_notif(Name, Id,Status, DL)
 	end;
 
 maybe_notif_torrent2(_, _, _, _, Other) ->
 	log(critical, "notif exception: ", [Other]).
+
+
+do_notif(Name, Id, Status, DL) ->
+	 log(info, "torrent status change {Name, Id, Status}: ", [[Name, Id, Status]]),
+	 ?SWITCH:publish(notif, {torrent, 3, {Name, Id, Status, DL}}).
+
+	
+
+maybe_repeat_notif(CurrentCount, Count, Name, Id, Status, DL) ->
+	RI=get(transmission.repeat.status.interval),
+	Delta=CurrentCount-Count,
+	case Delta>RI of
+		true ->
+			%% reset counter
+			put({torrent, Name}, {Id, Status, DL, CurrentCount}),
+			do_notif(Name, Id, Status, DL);
+		_ -> 
+			do_nothing
+	end.
 
 
 
@@ -277,6 +286,15 @@ maybe_grab_sid({_, Sid}) ->
 
 maybe_grab_sid(_) ->
 	ok.
+
+get_clock_min() ->
+	MinCount=get(clock.min),
+	case MinCount of
+		undefined ->
+			0;
+		Count -> Count
+	end.
+
 
 
 
@@ -299,7 +317,8 @@ maybe_do_polling(_, _SessionId) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%  HANDLERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ----------------------            ------------------------------
 
-handle({hwswitch, _From, clock, {tick.min, _Count}}) ->
+handle({hwswitch, _From, clock, {tick.min, Count}}) ->
+	put(clock.min, Count),
 	?CTOOLS:do_publish_config_version(?SWITCH, ?SERVER);
 
 handle({hwswitch, _From, clock, {tick.sync, _Count}}) ->
@@ -412,11 +431,15 @@ blacklist() ->
 defaults() ->
 	[
 	 %% poll interval (in ms)
-	 {transmission.poll.interval,     optional, int,  30*1000}
-	,{transmission.poll.interval.min, optional, int,  1*1000}
-	,{transmission.poll.interval.max, optional, int,  10*60*1000}
+	 {transmission.poll.interval,          optional, int,  30*1000}
+	,{transmission.poll.interval.min,      optional, int,  1*1000}
+	,{transmission.poll.interval.max,      optional, int,  10*60*1000}
 	 
+	,{transmission.repeat.status.interval,     optional, int,  1*60*1000}
+	,{transmission.repeat.status.interval.min, optional, int,  1*60*1000}
+	,{transmission.repeat.status.interval.max, optional, int,  10*60*1000}
+	
 	%% Write a '.completed' file when a download is finished
-	,{transmission.write.completed, optional, atom, true}
+	%,{transmission.write.completed, optional, atom, true}
 	 ].
 

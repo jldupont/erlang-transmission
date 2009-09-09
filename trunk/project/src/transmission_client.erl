@@ -99,6 +99,7 @@ request(ReturnDetails, _SessionId, Method, _MandatoryParams, _OptionalParams) ->
 %% @private
 doreq(Rd, SessionId, get, Method, MandatoryParams, OpParams) ->
 	Params=[{"method", Method}]++lists:append(MandatoryParams, OpParams),
+	%io:format("doreq: params<~p>~n~n", [Params]),
 	PL=?TOOLS:encode_list(Params),
 	Req=format_encoded_list(PL),
 	Headers=cond_add_to_list("X-Transmission-Session-Id", SessionId, []),	
@@ -239,6 +240,12 @@ decoded: body<{ok,
                    {result,\"success\"}]}".
 
 
+'example.torrent.remove'() ->
+" {struct, [{arguments,
+		{struct,[]}},
+        	{result,\"success\"}]}
+".
+
 
 %% ----------------------           ------------------------------
 %%%%%%%%%%%%%%%%%%%%%%%%%  HELPERS  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -305,8 +312,9 @@ extract(JS, arguments) ->
 	%io:format("arguments: extracting from: ~p~n~n~n", [JS]),
 	try
 		{struct, Top}=JS,
-		[{arguments, Arguments}|_Rest] = Top,
-		Arguments
+		[{arguments, Arguments}|Result] = Top,
+		%io:format("extract: rest: ~p~n~n", [Rest]),
+		{Arguments, Result}
 	catch
 		_:_ -> error
 	end;
