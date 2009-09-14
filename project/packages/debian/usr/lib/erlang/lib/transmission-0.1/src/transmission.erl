@@ -98,7 +98,7 @@ loop() ->
 
 		
 		%%%% CONFIGURATION MANAGEMENT
-		
+		%%
 		{config, Version, Config} ->
 			?CTOOLS:put_config(Version, Config);
 		
