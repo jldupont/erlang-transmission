@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 erlang-transmission
 
@@ -127,13 +128,22 @@ class targets(object):
 			print "! can't find Google Code password [~/.gcpwd]\n"
 			sys.exit(1)
 			
+		try:
+			print "  > uploading sources"
+			#upload(file, project_name, user_name, password, summary, labels=None)
+			src = "/tmp/%s-sources-%s.zip" % (this_lib, version)
+			gc.upload(src, "erlang-transmission", user, pwd, "sources archive", ["sources", "featured"])
+		except:
+			print "! failed to upload"
+			raise
 		
-		#upload(file, project_name, user_name, password, summary, labels=None)
-		src = "/tmp/%s-sources-%s.zip" % (this_lib, version)
-		gc.upload(src, "erlang-twitter", user, pwd, "sources archive", ["sources", "featured"])
-		
-		deb = "/tmp/%s_%s-1_all.deb" % (this_lib, version)
-		gc.upload(deb, this_lib, user, pwd, "debian", ["Type-Package", "OpSys-Linux", "featured"])
+		try:
+			print "  > uploaded .deb"
+			deb = "/tmp/%s_%s-1_all.deb" % (this_lib, version)
+			gc.upload(deb, this_lib, user, pwd, "debian", ["Type-Package", "OpSys-Linux", "featured"])
+		except:
+			print "! failed to upload"
+			raise
 
 	
 	def default(cls):
